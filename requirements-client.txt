@@ -1,0 +1,8 @@
+PySide6>=6.6.0
+requests>=2.31.0
+# Опционально для Windows Event Log (если pywin32 не установлен, используется PowerShell):
+# pywin32>=305; sys_platform == "win32"
+
+
+
+
