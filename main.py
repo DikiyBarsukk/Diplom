@@ -11,13 +11,21 @@ def run_server(host: str, port: int, db_path: str = "logs.db") -> None:
     Запускает сервер для приема и обработки логов от агентов.
     """
     from fastapi import FastAPI, Body, Query
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, HTMLResponse
+    from fastapi.staticfiles import StaticFiles
+    from pathlib import Path
     import uvicorn
 
     from server.parser import normalize_event
     from server.storage import LogStorage
 
     app = FastAPI(title="Log Audit Server", version="0.2")
+
+    # Mount static files
+    web_dir = Path(__file__).parent / "web"
+    static_dir = web_dir / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     storage = LogStorage(db_path=db_path)
 
@@ -58,6 +66,7 @@ def run_server(host: str, port: int, db_path: str = "logs.db") -> None:
         host: str | None = Query(None),
         severity: str | None = Query(None),
         since: str | None = Query(None),
+        search: str | None = Query(None),
         limit: int = Query(200, ge=1, le=1000),
         offset: int = Query(0, ge=0),
     ) -> JSONResponse:
@@ -68,6 +77,7 @@ def run_server(host: str, port: int, db_path: str = "logs.db") -> None:
             host=host,
             severity=severity,
             since=since,
+            search=search,
             limit=limit,
             offset=offset,
         )
@@ -79,6 +89,16 @@ def run_server(host: str, port: int, db_path: str = "logs.db") -> None:
         Возвращает статистику по логам.
         """
         return JSONResponse(storage.get_stats())
+
+    @app.get("/", response_class=HTMLResponse)
+    def dashboard() -> HTMLResponse:
+        """
+        Возвращает главную страницу дашборда.
+        """
+        index_file = web_dir / "index.html"
+        if index_file.exists():
+            return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Dashboard not found</h1>", status_code=404)
 
     uvicorn.run(app, host=host, port=port)
 

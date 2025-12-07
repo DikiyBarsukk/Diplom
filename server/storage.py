@@ -115,6 +115,7 @@ class LogStorage:
         host: Optional[str] = None,
         severity: Optional[str] = None,
         since: Optional[str] = None,
+        search: Optional[str] = None,
         limit: int = 200,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
@@ -125,6 +126,7 @@ class LogStorage:
             host: фильтр по хосту
             severity: фильтр по уровню важности
             since: фильтр по времени (ISO формат)
+            search: поиск по содержимому сообщения (LIKE поиск)
             limit: максимальное количество событий
             offset: смещение для пагинации
         
@@ -149,6 +151,10 @@ class LogStorage:
         if since:
             conditions.append("ts >= ?")
             params.append(since)
+
+        if search:
+            conditions.append("message LIKE ?")
+            params.append(f"%{search}%")
 
         where_clause = ""
         if conditions:

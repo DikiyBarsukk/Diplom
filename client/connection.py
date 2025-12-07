@@ -23,6 +23,7 @@ class ServerClient:
         host: Optional[str] = None,
         severity: Optional[str] = None,
         since: Optional[str] = None,
+        search: Optional[str] = None,
         limit: int = 200,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
@@ -33,6 +34,7 @@ class ServerClient:
             host: фильтр по хосту
             severity: фильтр по уровню важности (err, warn, info, debug и т.д.)
             since: фильтр по времени (ISO формат)
+            search: поиск по содержимому сообщения
             limit: максимальное количество событий
             offset: смещение для пагинации
         
@@ -46,6 +48,8 @@ class ServerClient:
             params["severity"] = severity
         if since:
             params["since"] = since
+        if search:
+            params["search"] = search
         
         resp = requests.get(f"{self.base_url}/logs", params=params, timeout=self.timeout)
         resp.raise_for_status()
