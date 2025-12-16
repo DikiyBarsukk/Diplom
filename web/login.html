@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход - Панель управления аудитом</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: var(--bg-color);
+        }
+        .login-box {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-box h1 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .form-group label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .form-group input {
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        .error-message {
+            color: var(--danger-color);
+            background: #fee2e2;
+            padding: 0.75rem;
+            border-radius: 6px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+        .login-btn {
+            padding: 0.75rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .login-btn:hover {
+            background: var(--secondary-color);
+        }
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1>Вход в систему</h1>
+            <div class="error-message" id="errorMessage"></div>
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="username">Имя пользователя</label>
+                    <input type="text" id="username" name="username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="login-btn" id="loginBtn">Войти</button>
+            </form>
+            <div style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary); text-align: center;">
+                <p>По умолчанию: admin / Admin123!@#</p>
+                <p style="font-size: 0.75rem; margin-top: 0.5rem;">Пароль соответствует политике безопасности</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            errorMessage.classList.remove('show');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Вход...';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Успешный вход - перенаправляем на главную страницу
+                    window.location.href = '/';
+                } else {
+                    errorMessage.textContent = data.error || 'Ошибка входа';
+                    errorMessage.classList.add('show');
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Войти';
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Ошибка подключения к серверу';
+                errorMessage.classList.add('show');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Войти';
+            }
+        });
+    </script>
+</body>
+</html>
+

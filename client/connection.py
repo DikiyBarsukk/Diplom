@@ -1,6 +1,9 @@
+import logging
 from typing import Any, Dict, List, Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class ServerClient:
@@ -14,9 +17,16 @@ class ServerClient:
 
     def health(self) -> Dict[str, Any]:
         """Проверяет доступность сервера."""
-        resp = requests.get(f"{self.base_url}/health", timeout=self.timeout)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = requests.get(f"{self.base_url}/health", timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.Timeout:
+            logger.error(f"Timeout connecting to {self.base_url}/health")
+            raise
+        except requests.RequestException as e:
+            logger.error(f"Error connecting to server: {e}")
+            raise
 
     def fetch_logs(
         self,
@@ -51,17 +61,31 @@ class ServerClient:
         if search:
             params["search"] = search
         
-        resp = requests.get(f"{self.base_url}/logs", params=params, timeout=self.timeout)
-        resp.raise_for_status()
-        data = resp.json()
-        assert isinstance(data, list)
-        return data
+        try:
+            resp = requests.get(f"{self.base_url}/logs", params=params, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            assert isinstance(data, list)
+            return data
+        except requests.Timeout:
+            logger.error(f"Timeout fetching logs from {self.base_url}/logs")
+            raise
+        except requests.RequestException as e:
+            logger.error(f"Error fetching logs: {e}")
+            raise
 
     def get_stats(self) -> Dict[str, Any]:
         """Получает статистику по логам."""
-        resp = requests.get(f"{self.base_url}/stats", timeout=self.timeout)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = requests.get(f"{self.base_url}/stats", timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.Timeout:
+            logger.error(f"Timeout fetching stats from {self.base_url}/stats")
+            raise
+        except requests.RequestException as e:
+            logger.error(f"Error fetching stats: {e}")
+            raise
 
     def send_logs(self, logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -73,13 +97,20 @@ class ServerClient:
         Returns:
             Результат сохранения (saved, skipped)
         """
-        resp = requests.post(
-            f"{self.base_url}/logs",
-            json=logs,
-            timeout=self.timeout * 3  # Больший таймаут для отправки
-        )
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = requests.post(
+                f"{self.base_url}/logs",
+                json=logs,
+                timeout=self.timeout * 3  # Больший таймаут для отправки
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except requests.Timeout:
+            logger.error(f"Timeout sending logs to {self.base_url}/logs")
+            raise
+        except requests.RequestException as e:
+            logger.error(f"Error sending logs: {e}")
+            raise
 
 
 

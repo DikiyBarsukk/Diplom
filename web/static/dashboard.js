@@ -20,10 +20,76 @@ let refreshInterval = 30000; // 30 seconds default
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    checkAuth();
     loadDashboard();
     setupEventListeners();
     setupAutoRefresh();
 });
+
+// Проверка аутентификации
+async function checkAuth() {
+    try {
+        const response = await fetch('/api/auth/me', {
+            credentials: 'include'
+        });
+        
+        if (response.status === 401) {
+            // Не авторизован - перенаправляем на страницу входа
+            window.location.href = '/login';
+            return;
+        }
+        
+        if (response.ok) {
+            const user = await response.json();
+            document.getElementById('username').textContent = user.username || 'Администратор';
+        }
+    } catch (error) {
+        console.error('Auth check failed:', error);
+    }
+}
+
+// Обертка для fetch с обработкой ошибок аутентификации и CSRF защитой
+let csrfToken = null;
+
+async function authenticatedFetch(url, options = {}) {
+    // Получаем CSRF токен из заголовка ответа при первом запросе
+    if (!csrfToken && options.method && options.method !== 'GET') {
+        // Для операций изменения данных нужен CSRF токен
+        const meResponse = await fetch('/api/auth/me', {
+            credentials: 'include'
+        });
+        csrfToken = meResponse.headers.get('X-CSRF-Token');
+    }
+    
+    const headers = {
+        ...options.headers,
+        'Content-Type': 'application/json'
+    };
+    
+    // Добавляем CSRF токен для операций изменения данных
+    if (csrfToken && options.method && options.method !== 'GET') {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+    
+    const response = await fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers: headers
+    });
+    
+    // Обновляем CSRF токен из ответа
+    const newCsrfToken = response.headers.get('X-CSRF-Token');
+    if (newCsrfToken) {
+        csrfToken = newCsrfToken;
+    }
+    
+    if (response.status === 401) {
+        window.location.href = '/login';
+        throw new Error('Unauthorized');
+    }
+    
+    return response;
+}
 
 function initTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -101,6 +167,19 @@ function setupEventListeners() {
     document.getElementById('refreshInterval').addEventListener('change', updateRefreshInterval);
     document.getElementById('autoRefreshEnabled').addEventListener('change', toggleAutoRefresh);
     
+    // Logout
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await authenticatedFetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (error) {
+                window.location.href = '/login';
+            }
+        });
+    }
+    
     // Export
     document.getElementById('exportBtn').addEventListener('click', exportToCSV);
     
@@ -145,11 +224,11 @@ async function loadDashboard() {
         updateSystemStatus(true);
         
         // Load stats
-        const statsResponse = await fetch(`${API_BASE}/stats`);
+        const statsResponse = await authenticatedFetch(`${API_BASE}/stats`);
         const stats = await statsResponse.json();
         
         // Load events for calculations
-        const eventsResponse = await fetch(`${API_BASE}/logs?limit=1000`);
+        const eventsResponse = await authenticatedFetch(`${API_BASE}/logs?limit=1000`);
         const events = await eventsResponse.json();
         
         updateMetrics(stats, events);
@@ -643,7 +722,7 @@ async function loadLogs() {
             }
         }
         
-        const response = await fetch(url);
+        const response = await authenticatedFetch(url);
         const events = await response.json();
         
         allEvents = events;

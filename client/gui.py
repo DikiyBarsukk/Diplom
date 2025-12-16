@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
@@ -5,6 +6,8 @@ from PySide6 import QtCore, QtWidgets, QtCharts, QtGui
 from PySide6.QtCharts import QChart, QChartView, QBarSet, QBarSeries, QBarCategoryAxis, QValueAxis, QPieSeries, QLineSeries, QDateTimeAxis
 
 from client.connection import ServerClient
+
+logger = logging.getLogger(__name__)
 
 
 class LogsTableModel(QtCore.QAbstractTableModel):
@@ -243,6 +246,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.model.set_rows(events)
             self.status_label.setText(f"Loaded: {len(events)} events")
         except Exception as ex:
+            logger.error(f"Error fetching logs: {ex}", exc_info=True)
             self.status_label.setText(f"Error: {ex}")
 
     def on_row_double_clicked(self, index: QtCore.QModelIndex):
@@ -311,6 +315,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._update_timeline_chart(events)
             
         except Exception as ex:
+            logger.error(f"Failed to update dashboard: {ex}", exc_info=True)
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update dashboard: {ex}")
 
     def _update_severity_chart(self, stats: Dict[str, Any]):

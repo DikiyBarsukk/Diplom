@@ -10,12 +10,7 @@ import subprocess
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
-
-def _hostname() -> str:
-    try:
-        return socket.gethostname()
-    except Exception:
-        return "unknown-host"
+from common.log_utils import get_hostname, iter_journal_json, read_file_tail
 
 
 def get_windows_event_logs(limit: int = 200, since: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -36,7 +31,7 @@ def get_windows_event_logs(limit: int = 200, since: Optional[str] = None) -> Lis
         return _get_windows_logs_powershell(limit, since)
 
     results: List[Dict[str, Any]] = []
-    host = _hostname()
+    host = get_hostname()
 
     # Определяем время для фильтрации
     since_time = None
@@ -121,7 +116,7 @@ def _get_windows_logs_powershell(limit: int = 200, since: Optional[str] = None) 
     """
     Альтернативный метод сбора логов через PowerShell (если pywin32 недоступен).
     """
-    host = _hostname()
+    host = get_hostname()
     results: List[Dict[str, Any]] = []
 
     # PowerShell команда для получения событий
@@ -169,40 +164,6 @@ def _get_windows_logs_powershell(limit: int = 200, since: Optional[str] = None) 
     return results[:limit]
 
 
-def iter_journal_json(limit: int = 200, since: Optional[str] = None) -> Iterable[Dict[str, Any]]:
-    """
-    Итератор для чтения journalctl в формате JSON (Linux).
-    """
-    if platform.system().lower() != "linux":
-        return iter(())
-
-    cmd = [
-        "journalctl",
-        "-o",
-        "json",
-        "-n",
-        str(max(1, limit)),
-    ]
-    if since:
-        cmd.extend(["--since", since])
-
-    try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    except FileNotFoundError:
-        return iter(())
-
-    def _gen() -> Iterable[Dict[str, Any]]:
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except Exception:
-                continue
-
-    return _gen()
 
 
 def read_file_tail(paths: List[str], limit: int = 200) -> List[Dict[str, Any]]:
@@ -238,7 +199,7 @@ def collect_logs(source: str = "auto", limit: int = 200, since: Optional[str] = 
     Returns:
         Список сырых событий с полем "host"
     """
-    host = _hostname()
+    host = get_hostname()
     system = platform.system().lower()
 
     # Автоопределение источника

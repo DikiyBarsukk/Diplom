@@ -102,6 +102,22 @@ body {
     color: var(--text-primary);
 }
 
+.logout-btn {
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--text-secondary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.logout-btn:hover {
+    background: var(--danger-color);
+}
+
 .breadcrumb {
     color: var(--text-secondary);
     font-size: 0.875rem;
