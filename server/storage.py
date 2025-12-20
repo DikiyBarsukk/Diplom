@@ -42,38 +42,28 @@ class LogStorage:
             При первом запуске автоматически создаются таблицы и индексы.
         """
         self.db_path = db_path
-        self._connection = None
         self._init_db()
     
     @contextmanager
     def _get_connection(self) -> Iterator[sqlite3.Connection]:
         """
         Context manager для получения соединения с БД.
-        Переиспользует соединение если возможно, иначе создает новое.
+        Создает новое соединение для каждого запроса (безопасно для многопоточности).
         """
-        if self._connection is None:
-            self._connection = sqlite3.connect(self.db_path)
-            self._connection.row_factory = sqlite3.Row
+        conn = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False  # Разрешаем использование из разных потоков
+        )
+        conn.row_factory = sqlite3.Row
         
         try:
-            yield self._connection
+            yield conn
+            conn.commit()
         except Exception:
-            # При ошибке закрываем соединение
-            if self._connection:
-                try:
-                    self._connection.rollback()
-                except Exception:
-                    pass
+            conn.rollback()
             raise
-    
-    def _close_connection(self):
-        """Закрывает соединение с БД."""
-        if self._connection:
-            try:
-                self._connection.close()
-            except Exception:
-                pass
-            self._connection = None
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         """Инициализирует базу данных и создает таблицы."""
@@ -359,9 +349,6 @@ class LogStorage:
             >>> since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
             >>> events = storage.get_events(since=since)
         """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-
         conditions = []
         params = []
 
@@ -393,6 +380,8 @@ class LogStorage:
         """
         params.extend([limit, offset])
 
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
             cursor.execute(query, params)
             rows = cursor.fetchall()
 

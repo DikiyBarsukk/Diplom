@@ -357,13 +357,13 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
             "incidents_detected": len(incidents),
         })
 
-    @app.get("/logs")
+    @app.get("/api/logs")
     def get_logs(
         host: str | None = Query(None),
         severity: str | None = Query(None),
         since: str | None = Query(None),
         search: str | None = Query(None),
-        limit: int = Query(200, ge=1, le=1000),
+        limit: int = Query(200, ge=1, le=10000),
         offset: int = Query(0, ge=0),
         user: Dict[str, Any] = Depends(require_auth),
         request: Request = None
@@ -551,6 +551,28 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         if index_file.exists():
             return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
         return HTMLResponse(content="<h1>Dashboard not found</h1>", status_code=404)
+    
+    @app.get("/logs", response_class=HTMLResponse)
+    def logs_page(session_token: str = Cookie(None)) -> HTMLResponse:
+        """Страница журналов событий."""
+        if not session_token or not auth_manager.validate_session(session_token):
+            return RedirectResponse(url="/login")
+        
+        logs_file = web_dir / "logs.html"
+        if logs_file.exists():
+            return HTMLResponse(content=logs_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Logs page not found</h1>", status_code=404)
+    
+    @app.get("/analytics", response_class=HTMLResponse)
+    def analytics_page(session_token: str = Cookie(None)) -> HTMLResponse:
+        """Страница аналитики."""
+        if not session_token or not auth_manager.validate_session(session_token):
+            return RedirectResponse(url="/login")
+        
+        analytics_file = web_dir / "analytics.html"
+        if analytics_file.exists():
+            return HTMLResponse(content=analytics_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Analytics page not found</h1>", status_code=404)
     
     @app.get("/login", response_class=HTMLResponse)
     def login_page() -> HTMLResponse:

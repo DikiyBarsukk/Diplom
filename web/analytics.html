@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления аудитом - Обзор управления</title>
+    <title>Панель управления аудитом - Аналитика</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -27,14 +27,14 @@
                 <button id="logoutBtn" class="logout-btn" title="Выход">Выход</button>
             </div>
             <nav class="breadcrumb">
-                <span>Панели управления</span> > <span class="current">Обзор управления</span>
+                <span>Панели управления</span> > <span class="current">Аналитика</span>
             </nav>
         </div>
     </header>
 
     <!-- Sidebar -->
     <aside class="sidebar">
-        <a href="/" class="sidebar-icon active" title="Панель управления">
+        <a href="/" class="sidebar-icon" title="Панель управления">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
             </svg>
@@ -44,7 +44,7 @@
                 <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
             </svg>
         </a>
-        <a href="/analytics" class="sidebar-icon" title="Аналитика">
+        <a href="/analytics" class="sidebar-icon active" title="Аналитика">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
             </svg>
@@ -61,49 +61,9 @@
         <div class="dashboard-header">
             <div class="header-top">
                 <div>
-                    <h2 id="page-title">Управление - Обзор</h2>
-                    <p class="powered-by">Система панели управления аудитом</p>
+                    <h2>Аналитика</h2>
+                    <p class="powered-by">Визуализация и анализ событий системы</p>
                 </div>
-                <div class="header-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Всего событий:</span>
-                        <span class="stat-value" id="total-events-count">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Последнее обновление:</span>
-                        <span class="stat-value" id="last-update-time">--:--</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Статус:</span>
-                        <span class="stat-value status-indicator" id="system-status">
-                            <span class="status-dot online"></span> Онлайн
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Key Metrics Cards -->
-        <div class="metrics-grid">
-            <div class="metric-card blue">
-                <div class="metric-label">% Критических событий</div>
-                <div class="metric-value" id="critical-percent">0%</div>
-                <div class="metric-subtitle">События >= Порога</div>
-            </div>
-            <div class="metric-card green">
-                <div class="metric-label"># Критических событий</div>
-                <div class="metric-value" id="critical-count">0</div>
-                <div class="metric-subtitle">Средний порог: <span id="avg-threshold">0</span></div>
-            </div>
-            <div class="metric-card purple">
-                <div class="metric-label">Прогресс анализа</div>
-                <div class="metric-value" id="analysis-progress">0%</div>
-                <div class="metric-subtitle">События проанализированы</div>
-            </div>
-            <div class="metric-card dark">
-                <div class="metric-label">Прогресс обработки</div>
-                <div class="metric-value" id="response-progress">0%</div>
-                <div class="metric-subtitle">Для критических событий</div>
             </div>
         </div>
 
@@ -183,19 +143,6 @@
         </div>
     </main>
 
-    <!-- Modal for Event Details -->
-    <div id="eventModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Детали события</h3>
-                <span class="modal-close" id="modalClose">&times;</span>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Will be populated by JS -->
-            </div>
-        </div>
-    </div>
-
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
         <div class="modal-content">
@@ -227,7 +174,7 @@
         </div>
     </div>
 
-    <script src="/static/dashboard.js"></script>
+    <script src="/static/analytics.js"></script>
 </body>
 </html>
 

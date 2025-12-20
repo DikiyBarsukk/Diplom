@@ -18,12 +18,25 @@ let autoRefreshInterval = null;
 let refreshInterval = 30000; // 30 seconds default
 
 // Initialize dashboard
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    checkAuth();
-    loadDashboard();
-    setupEventListeners();
-    setupAutoRefresh();
+    setupEventListeners(); // Привязываем обработчики сразу после инициализации темы
+    
+    // Инициализируем время обновления сразу и обновляем каждую секунду
+    updateLastUpdateTime();
+    setInterval(() => {
+        updateLastUpdateTime();
+    }, 1000);
+    
+    // Сначала проверяем аутентификацию, затем загружаем данные
+    try {
+        await checkAuth();
+        await loadDashboard();
+        setupAutoRefresh();
+    } catch (error) {
+        console.error('Initialization error:', error);
+        updateSystemStatus(false);
+    }
 });
 
 // Проверка аутентификации
@@ -36,15 +49,22 @@ async function checkAuth() {
         if (response.status === 401) {
             // Не авторизован - перенаправляем на страницу входа
             window.location.href = '/login';
-            return;
+            throw new Error('Unauthorized');
         }
         
         if (response.ok) {
             const user = await response.json();
-            document.getElementById('username').textContent = user.username || 'Администратор';
+            const usernameEl = document.getElementById('username');
+            if (usernameEl) {
+                usernameEl.textContent = user.username || 'Администратор';
+            }
+            return true;
         }
+        
+        throw new Error('Auth check failed');
     } catch (error) {
         console.error('Auth check failed:', error);
+        throw error;
     }
 }
 
@@ -93,44 +113,81 @@ async function authenticatedFetch(url, options = {}) {
 
 function initTheme() {
     const savedTheme = localStorage.getItem('theme');
+    const themeToggle = document.getElementById('themeToggle');
+    
     if (savedTheme === 'dark') {
         document.body.classList.add('dark-theme');
-        document.getElementById('themeToggle').textContent = '☀️';
+        if (themeToggle) {
+            themeToggle.textContent = '☀️';
+        }
+    } else if (themeToggle) {
+        themeToggle.textContent = '🌙';
     }
 }
 
 function setupEventListeners() {
-    // Refresh button
-    document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+    // Settings sidebar button
+    const settingsSidebarBtn = document.getElementById('settingsSidebarBtn');
+    if (settingsSidebarBtn) {
+        settingsSidebarBtn.addEventListener('click', showSettings);
+    }
     
-    // Filters
-    document.getElementById('severityFilter').addEventListener('change', () => {
-        currentPage = 1;
-        loadLogs();
-    });
-    document.getElementById('hostFilter').addEventListener('change', () => {
-        currentPage = 1;
-        loadLogs();
-    });
-    document.getElementById('timeFilter').addEventListener('change', handleTimeFilterChange);
-    document.getElementById('searchInput').addEventListener('input', debounce(() => {
-        currentPage = 1;
-        loadLogs();
-    }, 500));
+    // Refresh button
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadDashboard);
+    }
+    
+    // Filters (только если элементы существуют)
+    const severityFilter = document.getElementById('severityFilter');
+    if (severityFilter) {
+        severityFilter.addEventListener('change', () => {
+            currentPage = 1;
+            loadLogs();
+        });
+    }
+    
+    const hostFilter = document.getElementById('hostFilter');
+    if (hostFilter) {
+        hostFilter.addEventListener('change', () => {
+            currentPage = 1;
+            loadLogs();
+        });
+    }
+    
+    const timeFilter = document.getElementById('timeFilter');
+    if (timeFilter) {
+        timeFilter.addEventListener('change', handleTimeFilterChange);
+    }
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(() => {
+            currentPage = 1;
+            loadLogs();
+        }, 500));
+    }
     
     // Pagination
-    document.getElementById('prevPage').addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            loadLogs();
-        }
-    });
-    document.getElementById('nextPage').addEventListener('click', () => {
-        if (currentPage < Math.ceil(totalEvents / pageSize)) {
-            currentPage++;
-            loadLogs();
-        }
-    });
+    const prevPage = document.getElementById('prevPage');
+    if (prevPage) {
+        prevPage.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadLogs();
+            }
+        });
+    }
+    
+    const nextPage = document.getElementById('nextPage');
+    if (nextPage) {
+        nextPage.addEventListener('click', () => {
+            if (currentPage < Math.ceil(totalEvents / pageSize)) {
+                currentPage++;
+                loadLogs();
+            }
+        });
+    }
     
     // Sorting
     document.querySelectorAll('.sortable').forEach(header => {
@@ -148,24 +205,60 @@ function setupEventListeners() {
     });
     
     // Table row clicks
-    document.getElementById('logsTableBody').addEventListener('click', (e) => {
-        const row = e.target.closest('tr');
-        if (row && row.dataset.eventIndex !== undefined) {
-            showEventDetails(parseInt(row.dataset.eventIndex));
-        }
-    });
+    const logsTableBody = document.getElementById('logsTableBody');
+    if (logsTableBody) {
+        logsTableBody.addEventListener('click', (e) => {
+            const row = e.target.closest('tr');
+            if (row && row.dataset.eventIndex !== undefined) {
+                showEventDetails(parseInt(row.dataset.eventIndex));
+            }
+        });
+    }
     
     // Modal close
-    document.getElementById('modalClose').addEventListener('click', closeEventModal);
-    document.getElementById('settingsClose').addEventListener('click', closeSettingsModal);
+    const modalClose = document.getElementById('modalClose');
+    if (modalClose) {
+        modalClose.addEventListener('click', closeEventModal);
+    }
+    
+    const settingsClose = document.getElementById('settingsClose');
+    if (settingsClose) {
+        settingsClose.addEventListener('click', closeSettingsModal);
+    }
     
     // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        // Используем onclick для надежности (работает даже если addEventListener не сработал)
+        themeToggle.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTheme();
+            return false;
+        };
+        // Также добавляем через addEventListener для совместимости
+        themeToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTheme();
+        });
+    }
     
     // Settings
-    document.getElementById('settingsBtn').addEventListener('click', showSettings);
-    document.getElementById('refreshInterval').addEventListener('change', updateRefreshInterval);
-    document.getElementById('autoRefreshEnabled').addEventListener('change', toggleAutoRefresh);
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', showSettings);
+    }
+    
+    const refreshInterval = document.getElementById('refreshInterval');
+    if (refreshInterval) {
+        refreshInterval.addEventListener('change', updateRefreshInterval);
+    }
+    
+    const autoRefreshEnabled = document.getElementById('autoRefreshEnabled');
+    if (autoRefreshEnabled) {
+        autoRefreshEnabled.addEventListener('change', toggleAutoRefresh);
+    }
     
     // Logout
     const logoutBtn = document.getElementById('logoutBtn');
@@ -181,10 +274,16 @@ function setupEventListeners() {
     }
     
     // Export
-    document.getElementById('exportBtn').addEventListener('click', exportToCSV);
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportToCSV);
+    }
     
     // Timeline period
-    document.getElementById('timelinePeriod').addEventListener('change', updateTimelineChart);
+    const timelinePeriod = document.getElementById('timelinePeriod');
+    if (timelinePeriod) {
+        timelinePeriod.addEventListener('change', updateTimelineChart);
+    }
     
     // Close modals on outside click
     window.addEventListener('click', (e) => {
@@ -193,6 +292,16 @@ function setupEventListeners() {
         if (e.target === eventModal) closeEventModal();
         if (e.target === settingsModal) closeSettingsModal();
     });
+    
+    // Notification bell click - открываем список инцидентов (если будет реализована страница)
+    const notificationsEl = document.querySelector('.notifications');
+    if (notificationsEl) {
+        notificationsEl.addEventListener('click', () => {
+            // Можно открыть модальное окно с инцидентами или перенаправить на страницу
+            alert('Функция просмотра инцидентов будет реализована. Показывается количество необработанных инцидентов безопасности.');
+            // В будущем: window.location.href = '/incidents';
+        });
+    }
 }
 
 function debounce(func, wait) {
@@ -208,12 +317,15 @@ function debounce(func, wait) {
 }
 
 function handleTimeFilterChange() {
-    const timeFilter = document.getElementById('timeFilter').value;
+    const timeFilterEl = document.getElementById('timeFilter');
+    if (!timeFilterEl) return;
+    
+    const timeFilter = timeFilterEl.value;
     const customRange = document.getElementById('customDateRange');
-    if (timeFilter === 'custom') {
+    if (timeFilter === 'custom' && customRange) {
         customRange.style.display = 'flex';
     } else {
-        customRange.style.display = 'none';
+        if (customRange) customRange.style.display = 'none';
         currentPage = 1;
         loadLogs();
     }
@@ -221,29 +333,101 @@ function handleTimeFilterChange() {
 
 async function loadDashboard() {
     try {
-        updateSystemStatus(true);
+        console.log('Loading dashboard...');
+        // Показываем статус "загрузка" перед запросами
+        const statusEl = document.getElementById('system-status');
+        if (statusEl) {
+            statusEl.innerHTML = '<span class="status-dot" style="background: #f59e0b;"></span> Загрузка...';
+        }
         
         // Load stats
+        console.log('Fetching stats from:', `${API_BASE}/stats`);
         const statsResponse = await authenticatedFetch(`${API_BASE}/stats`);
+        if (!statsResponse.ok) {
+            const errorText = await statsResponse.text();
+            console.error('Stats response error:', statsResponse.status, errorText);
+            throw new Error(`Stats request failed: ${statsResponse.status}`);
+        }
         const stats = await statsResponse.json();
+        console.log('Stats received:', stats);
         
         // Load events for calculations
-        const eventsResponse = await authenticatedFetch(`${API_BASE}/logs?limit=1000`);
+        console.log('Fetching events from:', `${API_BASE}/api/logs?limit=1000`);
+        const eventsResponse = await authenticatedFetch(`${API_BASE}/api/logs?limit=1000`);
+        if (!eventsResponse.ok) {
+            const errorText = await eventsResponse.text();
+            console.error('Events response error:', eventsResponse.status, errorText);
+            throw new Error(`Events request failed: ${eventsResponse.status}`);
+        }
         const events = await eventsResponse.json();
+        console.log('Events received:', events?.length || 0, 'events');
         
+        // Load incidents for alert count
+        try {
+            const incidentsStatsResponse = await authenticatedFetch(`${API_BASE}/api/incidents/stats`);
+            if (incidentsStatsResponse.ok) {
+                const incidentsStats = await incidentsStatsResponse.json();
+                // Показываем количество открытых (необработанных) инцидентов
+                const openIncidents = incidentsStats.open || 0;
+                const alertCountEl = document.getElementById('alert-count');
+                if (alertCountEl) {
+                    alertCountEl.textContent = openIncidents;
+                    // Скрываем бейдж, если инцидентов нет
+                    alertCountEl.style.display = openIncidents > 0 ? 'flex' : 'none';
+                }
+                console.log('Incidents stats received:', incidentsStats);
+            }
+        } catch (error) {
+            console.warn('Failed to load incidents stats:', error);
+            // Если не удалось загрузить инциденты, показываем критические события
+            const criticalCount = (stats.severity?.emerg || 0) + 
+                                 (stats.severity?.alert || 0) + 
+                                 (stats.severity?.crit || 0);
+            const alertCountEl = document.getElementById('alert-count');
+            if (alertCountEl) {
+                alertCountEl.textContent = criticalCount;
+                alertCountEl.style.display = criticalCount > 0 ? 'flex' : 'none';
+            }
+        }
+        
+        // Проверяем, что данные получены (events может быть пустым массивом - это нормально)
+        if (!stats) {
+            throw new Error('Invalid stats data received');
+        }
+        if (!Array.isArray(events)) {
+            throw new Error('Invalid events data received');
+        }
+        
+        console.log('Updating UI with data...');
         updateMetrics(stats, events);
         updateCharts(stats, events);
         updateHostFilter(stats);
-        updateLastUpdateTime();
+        updateLastUpdateTime(); // Обновляем время после успешной загрузки
+        updateSystemStatus(true); // Убеждаемся, что статус установлен как онлайн
         
         // Store all events for sorting/filtering
         allEvents = events;
         totalEvents = stats.total_events || 0;
         
-        loadLogs();
+        // Загружаем логи только если элементы существуют
+        const logsTableBody = document.getElementById('logsTableBody');
+        if (logsTableBody) {
+            loadLogs();
+        }
+        
+        console.log('Dashboard loaded successfully');
     } catch (error) {
         console.error('Error loading dashboard:', error);
         updateSystemStatus(false);
+        
+        // Показываем сообщение об ошибке пользователю
+        const tableInfo = document.getElementById('table-info');
+        if (tableInfo) {
+            tableInfo.textContent = `Ошибка загрузки данных: ${error.message}`;
+        }
+        
+        // Также показываем в консоли для отладки
+        console.error('Full error:', error);
     }
 }
 
@@ -272,15 +456,27 @@ function updateMetrics(stats, events) {
     const responseProgress = criticalCount > 0 ? 
         ((criticalCount * 0.6) / criticalCount * 100).toFixed(1) : 0;
     
-    document.getElementById('critical-percent').textContent = `${criticalPercent}%`;
-    document.getElementById('critical-count').textContent = criticalCount;
-    document.getElementById('avg-threshold').textContent = avgThreshold;
-    document.getElementById('analysis-progress').textContent = `${analysisProgress}%`;
-    document.getElementById('response-progress').textContent = `${responseProgress}%`;
-    document.getElementById('total-events-count').textContent = totalEvents.toLocaleString('ru-RU');
+    const criticalPercentEl = document.getElementById('critical-percent');
+    const criticalCountEl = document.getElementById('critical-count');
+    const avgThresholdEl = document.getElementById('avg-threshold');
+    const analysisProgressEl = document.getElementById('analysis-progress');
+    const responseProgressEl = document.getElementById('response-progress');
+    const totalEventsCountEl = document.getElementById('total-events-count');
+    const alertCountEl = document.getElementById('alert-count');
     
-    // Update alert count
-    document.getElementById('alert-count').textContent = criticalCount;
+    if (criticalPercentEl) criticalPercentEl.textContent = `${criticalPercent}%`;
+    if (criticalCountEl) criticalCountEl.textContent = criticalCount;
+    if (avgThresholdEl) avgThresholdEl.textContent = avgThreshold;
+    if (analysisProgressEl) analysisProgressEl.textContent = `${analysisProgress}%`;
+    if (responseProgressEl) responseProgressEl.textContent = `${responseProgress}%`;
+    if (totalEventsCountEl) totalEventsCountEl.textContent = totalEvents.toLocaleString('ru-RU');
+    
+    // alert-count теперь обновляется из инцидентов в loadDashboard
+    // Если инциденты не загрузились, показываем критические события как fallback
+    if (alertCountEl && alertCountEl.textContent === '0' || !alertCountEl.textContent) {
+        alertCountEl.textContent = criticalCount;
+        alertCountEl.style.display = criticalCount > 0 ? 'flex' : 'none';
+    }
 }
 
 function updateCharts(stats, events) {
@@ -293,7 +489,10 @@ function updateCharts(stats, events) {
 }
 
 function updateSeverityChart(stats) {
-    const ctx = document.getElementById('severityChart').getContext('2d');
+    const canvas = document.getElementById('severityChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
     const severityCounts = stats.severity || {};
     
     const severityLabels = {
@@ -376,13 +575,38 @@ function updateSeverityChart(stats) {
 }
 
 function updateStatusChart(events) {
-    const ctx = document.getElementById('statusChart').getContext('2d');
+    const canvas = document.getElementById('statusChart');
+    if (!canvas) return;
     
+    const ctx = canvas.getContext('2d');
+    
+    // Распределяем события по статусам на основе их severity
+    let tbd = 0;        // Требует решения - критические события
+    let implemented = 0; // Реализовано - обработанные ошибки
+    let planned = 0;    // Запланировано - предупреждения
+    let deferred = 0;   // Отложено - информационные события
+    
+    events.forEach(event => {
+        const severity = (event.severity || 'info').toLowerCase();
+        if (severity === 'emerg' || severity === 'alert' || severity === 'crit') {
+            tbd++;
+        } else if (severity === 'err') {
+            implemented++;
+        } else if (severity === 'warn') {
+            planned++;
+        } else {
+            deferred++;
+        }
+    });
+    
+    // Если нет событий, используем демо-данные для визуализации
     const total = events.length || 1;
-    const tbd = Math.floor(total * 0.576);
-    const implemented = Math.floor(total * 0.329);
-    const planned = Math.floor(total * 0.072);
-    const deferred = total - tbd - implemented - planned;
+    if (total === 0 || (tbd === 0 && implemented === 0 && planned === 0 && deferred === 0)) {
+        tbd = Math.floor(total * 0.576);
+        implemented = Math.floor(total * 0.329);
+        planned = Math.floor(total * 0.072);
+        deferred = total - tbd - implemented - planned;
+    }
     
     if (statusChart) {
         statusChart.destroy();
@@ -417,7 +641,10 @@ function updateStatusChart(events) {
 }
 
 function updateHostsChart(stats) {
-    const ctx = document.getElementById('hostsChart').getContext('2d');
+    const canvas = document.getElementById('hostsChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
     const hosts = stats.hosts || {};
     
     const sortedHosts = Object.entries(hosts)
@@ -467,9 +694,15 @@ function updateHostsChart(stats) {
                 if (elements.length > 0) {
                     const index = elements[0].index;
                     const host = labels[index];
-                    document.getElementById('hostFilter').value = host;
-                    currentPage = 1;
-                    loadLogs();
+                    const hostFilter = document.getElementById('hostFilter');
+                    if (hostFilter) {
+                        hostFilter.value = host;
+                        currentPage = 1;
+                        loadLogs();
+                    } else {
+                        // Если на странице аналитики - перенаправляем на страницу логов
+                        window.location.href = `/logs?host=${encodeURIComponent(host)}`;
+                    }
                 }
             }
         }
@@ -477,7 +710,10 @@ function updateHostsChart(stats) {
 }
 
 function updateSeveritiesChart(stats) {
-    const ctx = document.getElementById('severitiesChart').getContext('2d');
+    const canvas = document.getElementById('severitiesChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
     const severityCounts = stats.severity || {};
     
     const sorted = Object.entries(severityCounts)
@@ -537,9 +773,15 @@ function updateSeveritiesChart(stats) {
                 if (elements.length > 0) {
                     const index = elements[0].index;
                     const severity = sorted[index][0];
-                    document.getElementById('severityFilter').value = severity;
-                    currentPage = 1;
-                    loadLogs();
+                    const severityFilter = document.getElementById('severityFilter');
+                    if (severityFilter) {
+                        severityFilter.value = severity;
+                        currentPage = 1;
+                        loadLogs();
+                    } else {
+                        // Если на странице аналитики - перенаправляем на страницу логов
+                        window.location.href = `/logs?severity=${encodeURIComponent(severity)}`;
+                    }
                 }
             }
         }
@@ -551,38 +793,82 @@ function updateTimelineChart(events) {
     if (!ctx) return;
     
     const period = document.getElementById('timelinePeriod').value;
-    let hours = 24;
-    if (period === '7d') hours = 24 * 7;
-    if (period === '30d') hours = 24 * 30;
-    
-    // Group events by time
     const now = new Date();
-    const timeSlots = [];
-    const eventCounts = [];
+    let timeSlots = [];
+    let eventCounts = [];
     
-    for (let i = hours - 1; i >= 0; i--) {
-        const time = new Date(now);
-        time.setHours(time.getHours() - i);
-        time.setMinutes(0);
-        time.setSeconds(0);
-        time.setMilliseconds(0);
-        
-        const timeKey = time.toISOString();
-        timeSlots.push(time);
-        eventCounts.push(0);
-    }
-    
-    events.forEach(event => {
-        try {
-            const eventTime = new Date(event.ts);
-            const slotIndex = Math.floor((now - eventTime) / (1000 * 60 * 60));
-            if (slotIndex >= 0 && slotIndex < hours) {
-                eventCounts[hours - 1 - slotIndex]++;
-            }
-        } catch (e) {
-            // Ignore invalid dates
+    if (period === '24h') {
+        // Группировка по часам для 24 часов
+        for (let i = 23; i >= 0; i--) {
+            const time = new Date(now);
+            time.setHours(time.getHours() - i);
+            time.setMinutes(0);
+            time.setSeconds(0);
+            time.setMilliseconds(0);
+            timeSlots.push(time);
+            eventCounts.push(0);
         }
-    });
+        
+        events.forEach(event => {
+            try {
+                const eventTime = new Date(event.ts);
+                const hoursDiff = Math.floor((now - eventTime) / (1000 * 60 * 60));
+                if (hoursDiff >= 0 && hoursDiff < 24) {
+                    eventCounts[23 - hoursDiff]++;
+                }
+            } catch (e) {
+                // Ignore invalid dates
+            }
+        });
+    } else if (period === '7d') {
+        // Группировка по дням для 7 дней
+        for (let i = 6; i >= 0; i--) {
+            const time = new Date(now);
+            time.setDate(time.getDate() - i);
+            time.setHours(0);
+            time.setMinutes(0);
+            time.setSeconds(0);
+            time.setMilliseconds(0);
+            timeSlots.push(time);
+            eventCounts.push(0);
+        }
+        
+        events.forEach(event => {
+            try {
+                const eventTime = new Date(event.ts);
+                const daysDiff = Math.floor((now - eventTime) / (1000 * 60 * 60 * 24));
+                if (daysDiff >= 0 && daysDiff < 7) {
+                    eventCounts[6 - daysDiff]++;
+                }
+            } catch (e) {
+                // Ignore invalid dates
+            }
+        });
+    } else if (period === '30d') {
+        // Группировка по дням для 30 дней
+        for (let i = 29; i >= 0; i--) {
+            const time = new Date(now);
+            time.setDate(time.getDate() - i);
+            time.setHours(0);
+            time.setMinutes(0);
+            time.setSeconds(0);
+            time.setMilliseconds(0);
+            timeSlots.push(time);
+            eventCounts.push(0);
+        }
+        
+        events.forEach(event => {
+            try {
+                const eventTime = new Date(event.ts);
+                const daysDiff = Math.floor((now - eventTime) / (1000 * 60 * 60 * 24));
+                if (daysDiff >= 0 && daysDiff < 30) {
+                    eventCounts[29 - daysDiff]++;
+                }
+            } catch (e) {
+                // Ignore invalid dates
+            }
+        });
+    }
     
     if (timelineChart) {
         timelineChart.destroy();
@@ -635,10 +921,57 @@ function updateTimelineChart(events) {
 
 function updateHeatMap(events) {
     const tbody = document.getElementById('heatmapBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     const severities = ['Критическая', 'Высокая', 'Средняя', 'Низкая', 'Незначительная'];
     const likelihoods = ['Редко', 'Маловероятно', 'Умеренно', 'Вероятно', 'Почти наверняка'];
+    
+    // Маппинг severity из события в категории тепловой карты
+    const severityMap = {
+        'emerg': 'Критическая',
+        'alert': 'Высокая',
+        'crit': 'Высокая',
+        'err': 'Средняя',
+        'warn': 'Средняя',
+        'notice': 'Низкая',
+        'info': 'Низкая',
+        'debug': 'Незначительная'
+    };
+    
+    // Подсчитываем частоту повторений сообщений и паттернов для определения likelihood
+    const messageFrequency = {};
+    const patternFrequency = {}; // Группировка по паттернам (без конкретных значений)
+    
+    events.forEach(event => {
+        const message = (event.message || '').substring(0, 100);
+        messageFrequency[message] = (messageFrequency[message] || 0) + 1;
+        
+        // Создаем паттерн из сообщения (убираем числа, IP адреса и т.д.)
+        const pattern = message
+            .replace(/\d+\.\d+\.\d+\.\d+/g, 'IP') // IP адреса
+            .replace(/\d+/g, 'N') // Числа
+            .replace(/\s+/g, ' ') // Множественные пробелы
+            .trim();
+        patternFrequency[pattern] = (patternFrequency[pattern] || 0) + 1;
+    });
+    
+    // Определяем максимальную частоту для нормализации
+    const maxFrequency = Math.max(...Object.values(messageFrequency), 1);
+    const maxPatternFrequency = Math.max(...Object.values(patternFrequency), 1);
+    
+    // Подсчитываем частоту по хостам и процессам для дополнительного контекста
+    const hostFrequency = {};
+    const processFrequency = {};
+    events.forEach(event => {
+        const host = event.host || 'unknown';
+        const process = event.process || 'unknown';
+        hostFrequency[host] = (hostFrequency[host] || 0) + 1;
+        processFrequency[process] = (processFrequency[process] || 0) + 1;
+    });
+    const maxHostFrequency = Math.max(...Object.values(hostFrequency), 1);
+    const maxProcessFrequency = Math.max(...Object.values(processFrequency), 1);
     
     const heatmapData = {};
     severities.forEach(sev => {
@@ -648,14 +981,62 @@ function updateHeatMap(events) {
         });
     });
     
-    events.forEach((event, idx) => {
-        const sevIdx = Math.min(Math.floor(idx / (events.length / severities.length)), severities.length - 1);
-        const likIdx = Math.min(Math.floor((idx % likelihoods.length)), likelihoods.length - 1);
-        const sev = severities[sevIdx];
-        const lik = likelihoods[likIdx];
-        heatmapData[sev][lik]++;
+    // Распределяем события по тепловой карте
+    events.forEach(event => {
+        // Определяем severity категорию
+        const eventSeverity = (event.severity || 'info').toLowerCase();
+        const severityCategory = severityMap[eventSeverity] || 'Низкая';
+        
+        // Определяем likelihood на основе комбинации факторов
+        const message = (event.message || '').substring(0, 100);
+        const messageFreq = messageFrequency[message] || 1;
+        const messageRatio = messageFreq / maxFrequency;
+        
+        // Паттерн частоты
+        const pattern = message
+            .replace(/\d+\.\d+\.\d+\.\d+/g, 'IP')
+            .replace(/\d+/g, 'N')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const patternFreq = patternFrequency[pattern] || 1;
+        const patternRatio = patternFreq / maxPatternFrequency;
+        
+        // Частота хоста и процесса
+        const host = event.host || 'unknown';
+        const process = event.process || 'unknown';
+        const hostRatio = (hostFrequency[host] || 1) / maxHostFrequency;
+        const processRatio = (processFrequency[process] || 1) / maxProcessFrequency;
+        
+        // Комбинированный показатель likelihood (взвешенная сумма)
+        // Больше веса у точных совпадений сообщений, меньше у паттернов
+        const combinedRatio = (messageRatio * 0.5) + (patternRatio * 0.3) + 
+                             (hostRatio * 0.1) + (processRatio * 0.1);
+        
+        let likelihoodCategory;
+        if (combinedRatio >= 0.7) {
+            likelihoodCategory = 'Почти наверняка';
+        } else if (combinedRatio >= 0.5) {
+            likelihoodCategory = 'Вероятно';
+        } else if (combinedRatio >= 0.3) {
+            likelihoodCategory = 'Умеренно';
+        } else if (combinedRatio >= 0.15) {
+            likelihoodCategory = 'Маловероятно';
+        } else {
+            likelihoodCategory = 'Редко';
+        }
+        
+        heatmapData[severityCategory][likelihoodCategory]++;
     });
     
+    // Находим максимальное значение для нормализации цветов
+    let maxCount = 0;
+    severities.forEach(sev => {
+        likelihoods.forEach(lik => {
+            maxCount = Math.max(maxCount, heatmapData[sev][lik]);
+        });
+    });
+    
+    // Отображаем тепловую карту
     severities.forEach(severity => {
         const row = document.createElement('tr');
         const severityCell = document.createElement('td');
@@ -668,10 +1049,16 @@ function updateHeatMap(events) {
             cell.textContent = count;
             cell.className = 'heatmap-cell';
             
-            if (count > 100) {
-                cell.classList.add('high');
-            } else if (count > 50) {
-                cell.classList.add('medium');
+            // Динамическая окраска на основе относительного значения
+            if (maxCount > 0) {
+                const ratio = count / maxCount;
+                if (ratio >= 0.7) {
+                    cell.classList.add('high');
+                } else if (ratio >= 0.4) {
+                    cell.classList.add('medium');
+                } else {
+                    cell.classList.add('low');
+                }
             } else {
                 cell.classList.add('low');
             }
@@ -700,12 +1087,22 @@ function updateHostFilter(stats) {
 
 async function loadLogs() {
     try {
-        const severity = document.getElementById('severityFilter').value;
-        const host = document.getElementById('hostFilter').value;
-        const search = document.getElementById('searchInput').value;
-        const timeFilter = document.getElementById('timeFilter').value;
+        const severityFilter = document.getElementById('severityFilter');
+        const hostFilter = document.getElementById('hostFilter');
+        const searchInput = document.getElementById('searchInput');
+        const timeFilterEl = document.getElementById('timeFilter');
         
-        let url = `${API_BASE}/logs?limit=10000`;
+        // Если элементов нет (например, на странице аналитики), не загружаем логи
+        if (!severityFilter || !hostFilter || !searchInput || !timeFilterEl) {
+            return;
+        }
+        
+        const severity = severityFilter.value;
+        const host = hostFilter.value;
+        const search = searchInput.value;
+        const timeFilter = timeFilterEl.value;
+        
+        let url = `${API_BASE}/api/logs?limit=10000`;
         if (severity) url += `&severity=${severity}`;
         if (host) url += `&host=${encodeURIComponent(host)}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -715,10 +1112,10 @@ async function loadLogs() {
             const since = getSinceDate(timeFilter);
             if (since) url += `&since=${since}`;
         } else if (timeFilter === 'custom') {
-            const dateFrom = document.getElementById('dateFrom').value;
-            const dateTo = document.getElementById('dateTo').value;
-            if (dateFrom) {
-                url += `&since=${new Date(dateFrom).toISOString()}`;
+            const dateFrom = document.getElementById('dateFrom');
+            const dateTo = document.getElementById('dateTo');
+            if (dateFrom && dateFrom.value) {
+                url += `&since=${new Date(dateFrom.value).toISOString()}`;
             }
         }
         
@@ -808,15 +1205,27 @@ function updatePaginationInfo(total) {
     totalEvents = total;
     const totalPages = Math.ceil(total / pageSize);
     
-    document.getElementById('pageInfo').textContent = 
-        `Страница ${currentPage} из ${totalPages} (Всего: ${total.toLocaleString('ru-RU')})`;
+    const pageInfo = document.getElementById('pageInfo');
+    if (pageInfo) {
+        pageInfo.textContent = 
+            `Страница ${currentPage} из ${totalPages} (Всего: ${total.toLocaleString('ru-RU')})`;
+    }
     
-    document.getElementById('prevPage').disabled = currentPage === 1;
-    document.getElementById('nextPage').disabled = currentPage >= totalPages;
+    const prevPage = document.getElementById('prevPage');
+    if (prevPage) {
+        prevPage.disabled = currentPage === 1;
+    }
+    
+    const nextPage = document.getElementById('nextPage');
+    if (nextPage) {
+        nextPage.disabled = currentPage >= totalPages;
+    }
 }
 
 function displayLogs(events) {
     const tbody = document.getElementById('logsTableBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (events.length === 0) {
@@ -961,7 +1370,12 @@ function closeSettingsModal() {
 function toggleTheme() {
     document.body.classList.toggle('dark-theme');
     const isDark = document.body.classList.contains('dark-theme');
-    document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+    const themeToggle = document.getElementById('themeToggle');
+    
+    if (themeToggle) {
+        themeToggle.textContent = isDark ? '☀️' : '🌙';
+    }
+    
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
 }
 
@@ -994,21 +1408,20 @@ function setupAutoRefresh() {
 }
 
 function updateLastUpdateTime() {
+    const timeEl = document.getElementById('last-update-time');
+    if (!timeEl) return;
+    
     const now = new Date();
-    document.getElementById('last-update-time').textContent = 
-        now.toLocaleTimeString('ru-RU');
+    timeEl.textContent = now.toLocaleTimeString('ru-RU');
 }
 
 function updateSystemStatus(online) {
     const statusEl = document.getElementById('system-status');
-    const dot = statusEl.querySelector('.status-dot');
+    if (!statusEl) return;
+    
     if (online) {
-        dot.classList.remove('offline');
-        dot.classList.add('online');
         statusEl.innerHTML = '<span class="status-dot online"></span> Онлайн';
     } else {
-        dot.classList.remove('online');
-        dot.classList.add('offline');
         statusEl.innerHTML = '<span class="status-dot offline"></span> Оффлайн';
     }
 }
@@ -1081,8 +1494,15 @@ function filterBySeverityLevel(level) {
     
     const severity = severityMap[level];
     if (severity) {
-        document.getElementById('severityFilter').value = severity;
-        currentPage = 1;
-        loadLogs();
+        const severityFilter = document.getElementById('severityFilter');
+        if (severityFilter) {
+            severityFilter.value = severity;
+            currentPage = 1;
+            loadLogs();
+        } else {
+            // Если на странице аналитики - перенаправляем на страницу логов
+            window.location.href = `/logs?severity=${encodeURIComponent(severity)}`;
+        }
     }
 }
+

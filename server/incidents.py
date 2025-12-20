@@ -101,10 +101,10 @@ class BruteForceRule(IncidentRule):
         # Фильтруем неудачные попытки входа
         failed_logins = [
             e for e in events
-            if e.get("message", "").lower().find("login_failed") != -1 or
-               e.get("message", "").lower().find("authentication failed") != -1 or
-               e.get("message", "").lower().find("invalid credentials") != -1 or
-               e.get("message", "").lower().find("неверный пароль") != -1
+            if (e.get("message") or "").lower().find("login_failed") != -1 or
+               (e.get("message") or "").lower().find("authentication failed") != -1 or
+               (e.get("message") or "").lower().find("invalid credentials") != -1 or
+               (e.get("message") or "").lower().find("неверный пароль") != -1
         ]
         
         if len(failed_logins) < self.threshold:
@@ -179,11 +179,11 @@ class UnauthorizedAccessRule(IncidentRule):
         admin_logins = []
         
         for event in events:
-            message = event.get("message", "").lower()
+            message = (event.get("message") or "").lower()
             # Ищем успешные входы администратора
             if (("login_success" in message or "successful login" in message or 
                  "успешный вход" in message) and
-                ("admin" in message or event.get("unit", "").lower() == "admin")):
+                ("admin" in message or (event.get("unit") or "").lower() == "admin")):
                 
                 try:
                     ts = event.get("ts", "")
@@ -243,8 +243,8 @@ class SuspiciousActivityRule(IncidentRule):
         download_events = []
         
         for event in events:
-            message = event.get("message", "").lower()
-            process = event.get("process", "").lower()
+            message = (event.get("message") or "").lower()
+            process = (event.get("process") or "").lower()
             
             # Ищем запуски PowerShell
             if ("powershell" in process or "powershell" in message or
@@ -326,8 +326,8 @@ class LogTamperingRule(IncidentRule):
         tampering_events = []
         
         for event in events:
-            message = event.get("message", "").lower()
-            process = event.get("process", "").lower()
+            message = (event.get("message") or "").lower()
+            process = (event.get("process") or "").lower()
             
             if any(keyword in message or keyword in process for keyword in tampering_keywords):
                 tampering_events.append(event)
@@ -385,7 +385,7 @@ class PrivilegeEscalationRule(IncidentRule):
         privileged_logins = []
         
         for event in events:
-            message = event.get("message", "").lower()
+            message = (event.get("message") or "").lower()
             event_id = event.get("raw", {}).get("EventID") or event.get("raw", {}).get("event_id")
             
             # Windows Event ID 4625 = неудачный вход
