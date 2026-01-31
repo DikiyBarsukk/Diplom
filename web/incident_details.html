@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html class="dark" lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Детали инцидента | BARSUKSIEM</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13a4ec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101c22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #233c48; border-radius: 10px; }
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #233c48;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-white font-display">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#233c48] px-6 py-3 bg-background-dark">
+    <div class="flex items-center gap-8">
+        <div class="flex items-center gap-4 text-white">
+            <div class="size-6 text-primary">
+                <span class="material-symbols-outlined text-3xl">shield_with_heart</span>
+            </div>
+            <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">BARSUKSIEM</h2>
+        </div>
+        <nav class="flex items-center gap-6">
+            <a class="text-[#92b7c9] hover:text-white text-sm font-medium leading-normal" href="/">Дашборд</a>
+            <a class="text-white border-b-2 border-primary pb-1 text-sm font-medium leading-normal" href="/incidents">Инциденты</a>
+            <a class="text-[#92b7c9] hover:text-white text-sm font-medium leading-normal" href="/logs">Журналы</a>
+            <a class="text-[#92b7c9] hover:text-white text-sm font-medium leading-normal" href="/analytics">Отчеты</a>
+        </nav>
+    </div>
+    <div class="flex flex-1 justify-end gap-4">
+        <label class="flex flex-col min-w-40 !h-9 max-w-64">
+            <div class="flex w-full flex-1 items-stretch rounded-lg h-full bg-[#233c48]">
+                <div class="text-[#92b7c9] flex items-center justify-center pl-3">
+                    <span class="material-symbols-outlined text-xl">search</span>
+                </div>
+                <input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:ring-0 text-sm placeholder:text-[#92b7c9]" placeholder="Поиск логов или активов..."/>
+            </div>
+        </label>
+        <div class="flex gap-2">
+            <button class="flex items-center justify-center rounded-lg h-9 w-9 bg-[#233c48] text-white" title="Уведомления">
+                <span class="material-symbols-outlined text-xl">notifications</span>
+            </button>
+            <div class="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center border border-primary/40">
+                <span class="material-symbols-outlined text-primary text-xl">person</span>
+            </div>
+        </div>
+    </div>
+</header>
+<main class="flex flex-col h-[calc(100vh-60px)]">
+    <div class="px-6 py-4 flex flex-col gap-2">
+        <div class="flex flex-wrap gap-2 items-center">
+            <a class="text-[#92b7c9] text-xs font-medium" href="#">Аудит ИБ</a>
+            <span class="text-[#92b7c9] text-xs">/</span>
+            <a class="text-[#92b7c9] text-xs font-medium" href="/incidents">Все инциденты</a>
+            <span class="text-[#92b7c9] text-xs">/</span>
+            <span class="text-white text-xs font-medium" id="incidentId">INC-0000</span>
+        </div>
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-black leading-tight tracking-tight flex items-center gap-3">
+                    Инцидент #<span id="incidentTitleId">INC-0000</span>
+                    <span class="bg-red-500/20 text-red-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-red-500/30" id="incidentSeverity">Критический</span>
+                    <span class="bg-primary/20 text-primary text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-primary/30" id="incidentStatus">Расследуется</span>
+                </h1>
+                <p class="text-[#92b7c9] text-sm mt-1 font-normal" id="incidentSummary">Описание события...</p>
+            </div>
+            <div class="flex gap-2">
+                <button class="bg-[#233c48] hover:bg-[#2d4d5c] text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">ios_share</span> Экспорт отчета
+                </button>
+                <button class="bg-primary hover:bg-primary/90 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">check_circle</span> Закрыть инцидент
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="px-6 grid grid-cols-4 gap-4 pb-4">
+        <div class="bg-[#1a2b34] border border-[#233c48] p-3 rounded-lg">
+            <p class="text-[#92b7c9] text-[10px] uppercase font-bold mb-1">Ответственный</p>
+            <div class="flex items-center gap-2">
+                <div class="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-[10px] font-bold">JD</div>
+                <span class="text-sm font-semibold">Jonathan Doe</span>
+            </div>
+        </div>
+        <div class="bg-[#1a2b34] border border-[#233c48] p-3 rounded-lg">
+            <p class="text-[#92b7c9] text-[10px] uppercase font-bold mb-1">Время обнаружения</p>
+            <p class="text-sm font-semibold" id="incidentDetected">--</p>
+        </div>
+        <div class="bg-[#1a2b34] border border-[#233c48] p-3 rounded-lg">
+            <p class="text-[#92b7c9] text-[10px] uppercase font-bold mb-1">Затронутые хосты</p>
+            <p class="text-sm font-semibold" id="incidentAssets">--</p>
+        </div>
+        <div class="bg-[#1a2b34] border border-[#233c48] p-3 rounded-lg">
+            <p class="text-[#92b7c9] text-[10px] uppercase font-bold mb-1">Категория события</p>
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-sm">lan</span>
+                <span class="text-sm font-semibold" id="incidentCategory">--</span>
+            </div>
+        </div>
+    </div>
+    <div class="flex-1 px-6 pb-6 grid grid-cols-12 gap-6 overflow-hidden">
+        <div class="col-span-3 flex flex-col gap-4 overflow-hidden">
+            <div class="bg-[#1a2b34] border border-[#233c48] rounded-lg p-4">
+                <h3 class="text-xs font-bold uppercase text-primary mb-3">Детали цели</h3>
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-[#92b7c9] text-[10px]">Основной хост</p>
+                        <p class="text-sm font-mono text-white" id="incidentHost">--</p>
+                    </div>
+                    <div>
+                        <p class="text-[#92b7c9] text-[10px]">ОС</p>
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-xs">grid_view</span>
+                            <p class="text-sm" id="incidentOs">—</p>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-[#92b7c9] text-[10px]">Сегмент сети</p>
+                        <p class="text-sm" id="incidentNetwork">—</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-[#1a2b34] border border-[#233c48] rounded-lg flex-1 flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-[#233c48] flex justify-between items-center">
+                    <h3 class="text-xs font-bold uppercase text-primary">Логи доказательств</h3>
+                    <span class="bg-[#233c48] text-[10px] px-2 py-0.5 rounded text-[#92b7c9]" id="evidenceCount">0 событий</span>
+                </div>
+                <div class="flex-1 overflow-y-auto custom-scrollbar p-2" id="evidenceList">
+                    <p class="text-xs text-[#92b7c9] p-2">Нет связанных событий.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-span-6 bg-[#1a2b34] border border-[#233c48] rounded-lg flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-[#233c48] flex justify-between items-center">
+                <h3 class="text-xs font-bold uppercase text-primary">Хронология инцидента</h3>
+                <div class="flex gap-2">
+                    <button class="p-1 hover:bg-[#233c48] rounded"><span class="material-symbols-outlined text-sm">filter_alt</span></button>
+                    <button class="p-1 hover:bg-[#233c48] rounded"><span class="material-symbols-outlined text-sm">add</span></button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-6 relative timeline-line" id="timelineList">
+                <p class="text-xs text-[#92b7c9]">Хронология пока пуста.</p>
+            </div>
+        </div>
+        <div class="col-span-3 flex flex-col gap-4">
+            <div class="bg-[#1a2b34] border border-[#233c48] rounded-lg p-4">
+                <h3 class="text-xs font-bold uppercase text-primary mb-4">Действия аудитора</h3>
+                <div class="flex flex-col gap-3">
+                    <button class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors">
+                        <span class="material-symbols-outlined text-lg">desktop_access_disabled</span> Изолировать хост
+                    </button>
+                    <button class="w-full bg-[#233c48] hover:bg-[#2d4d5c] text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm">
+                        <span class="material-symbols-outlined text-lg">lock_reset</span> Сбросить пароль
+                    </button>
+                    <button class="w-full bg-[#233c48] hover:bg-[#2d4d5c] text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm">
+                        <span class="material-symbols-outlined text-lg">block</span> Заблокировать IP
+                    </button>
+                    <button class="w-full bg-[#233c48] hover:bg-[#2d4d5c] text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm">
+                        <span class="material-symbols-outlined text-lg">mail_lock</span> Отключить учетную запись
+                    </button>
+                </div>
+            </div>
+            <div class="bg-[#1a2b34] border border-[#233c48] rounded-lg overflow-hidden flex flex-col">
+                <div class="p-4 flex justify-between items-center border-b border-[#233c48]">
+                    <h3 class="text-xs font-bold uppercase text-primary">Источник активности</h3>
+                    <span class="text-[10px] text-red-400 font-bold uppercase">Внешний источник</span>
+                </div>
+                <div class="h-40 bg-[#111c22] relative group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent"></div>
+                    <div class="absolute inset-0 flex items-center justify-center opacity-40">
+                        <span class="material-symbols-outlined text-6xl text-[#325567]">map</span>
+                    </div>
+                    <div class="absolute bottom-3 left-3 bg-background-dark/80 px-2 py-1 rounded text-[10px] border border-[#233c48]" id="sourceLocation">
+                        —
+                    </div>
+                </div>
+            </div>
+            <div class="bg-[#1a2b34] border border-[#233c48] rounded-lg p-4 flex-1 flex flex-col">
+                <h3 class="text-xs font-bold uppercase text-primary mb-3">Добавить заметку</h3>
+                <textarea class="flex-1 w-full bg-[#111c22] border-[#233c48] rounded-lg text-sm text-white placeholder:text-[#92b7c9] focus:ring-primary focus:border-primary resize-none p-3 mb-3" placeholder="Введите комментарий..."></textarea>
+                <button class="w-full bg-primary/20 border border-primary/40 hover:bg-primary/30 text-primary font-bold py-2 rounded-lg text-xs transition-colors">
+                    Сохранить комментарий
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="/static/incident-details.js"></script>
+</body>
+</html>

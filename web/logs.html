@@ -1,181 +1,260 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html class="dark" lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления аудитом - Журналы</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Удаленный анализ журналов | BARSUKSIEM</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13a4ec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101c22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .sortable { cursor: pointer; user-select: none; }
+        .sortable::after { content: ' ↕'; opacity: 0.5; }
+        .sortable.asc::after { content: ' ↑'; opacity: 1; }
+        .sortable.desc::after { content: ' ↓'; opacity: 1; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #111c22; }
+        ::-webkit-scrollbar-thumb { background: #233c48; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #13a4ec; }
+    </style>
 </head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-left">
-            <h1 class="app-title">Панель управления аудитом</h1>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased min-h-screen flex flex-col">
+<header class="flex items-center justify-between border-b border-solid border-slate-200 dark:border-[#233c48] px-6 py-3 bg-white dark:bg-background-dark sticky top-0 z-50">
+    <div class="flex items-center gap-4">
+        <div class="text-primary">
+            <svg class="size-8" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path d="M44 11.2727C44 14.0109 39.8386 16.3957 33.69 17.6364C39.8386 18.877 44 21.2618 44 24C44 26.7382 39.8386 29.123 33.69 30.3636C39.8386 31.6043 44 33.9891 44 36.7273C44 40.7439 35.0457 44 24 44C12.9543 44 4 40.7439 4 36.7273C4 33.9891 8.16144 31.6043 14.31 30.3636C8.16144 29.123 4 26.7382 4 24C4 21.2618 8.16144 18.877 14.31 17.6364C8.16144 16.3957 4 14.0109 4 11.2727C4 7.25611 12.9543 4 24 4C35.0457 4 44 7.25611 44 11.2727Z" fill="currentColor"></path>
+            </svg>
         </div>
-        <div class="header-right">
-            <div class="header-controls">
-                <button id="themeToggle" class="theme-toggle" title="Переключить тему">🌙</button>
-                <button id="settingsBtn" class="settings-btn" title="Настройки">⚙️</button>
-            </div>
-            <div class="notifications">
-                <span class="notification-icon">🔔</span>
-                <span class="notification-badge" id="alert-count">0</span>
-            </div>
-            <div class="user-info">
-                <span class="username" id="username">Администратор</span>
-                <button id="logoutBtn" class="logout-btn" title="Выход">Выход</button>
-            </div>
-            <nav class="breadcrumb">
-                <span>Панели управления</span> > <span class="current">Журналы</span>
-            </nav>
+        <h2 class="text-lg font-bold leading-tight tracking-tight uppercase">BARSUKSIEM</h2>
+        <nav class="ml-10 hidden md:flex items-center gap-6">
+            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/">Аудит ИБ</a>
+            <a class="text-primary text-sm font-semibold border-b-2 border-primary py-1" href="/logs">Обозреватель журналов</a>
+            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/incidents">События ИБ</a>
+            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/analytics">Отчеты</a>
+        </nav>
+    </div>
+    <div class="flex items-center gap-4">
+        <div class="flex gap-2">
+            <button id="themeToggle" class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-[#233c48] hover:bg-slate-200 dark:hover:bg-[#2d4a58] transition-colors" title="Переключить тему">🌙</button>
+            <button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-[#233c48] hover:bg-slate-200 dark:hover:bg-[#2d4a58] transition-colors relative notifications" title="Уведомления">
+                <span class="material-symbols-outlined text-xl">notifications</span>
+                <span id="alert-count" class="hidden">0</span>
+                <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            <button id="settingsBtn" class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-[#233c48] hover:bg-slate-200 dark:hover:bg-[#2d4a58] transition-colors" title="Настройки">
+                <span class="material-symbols-outlined text-xl">settings</span>
+            </button>
         </div>
-    </header>
-
-    <!-- Sidebar -->
-    <aside class="sidebar">
-        <a href="/" class="sidebar-icon" title="Панель управления">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-            </svg>
-        </a>
-        <a href="/logs" class="sidebar-icon active" title="Журналы">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-            </svg>
-        </a>
-        <a href="/analytics" class="sidebar-icon" title="Аналитика">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
-            </svg>
-        </a>
-        <div class="sidebar-icon" id="settingsSidebarBtn" title="Настройки">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-            </svg>
+        <div class="flex items-center gap-3">
+            <div class="size-10 rounded-full border border-slate-200 dark:border-[#233c48] bg-cover bg-center flex items-center justify-center">
+                <span class="material-symbols-outlined text-[#92b7c9]">person</span>
+            </div>
+            <span class="text-sm font-medium" id="username">Аудитор</span>
+            <button id="logoutBtn" class="text-xs text-slate-500 dark:text-[#92b7c9] hover:text-primary">Выход</button>
+        </div>
+    </div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+    <aside class="w-72 border-r border-slate-200 dark:border-[#233c48] flex flex-col bg-white dark:bg-background-dark overflow-y-auto">
+        <div class="p-5 space-y-6">
+            <div>
+                <div class="flex flex-col mb-4">
+                    <h1 class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-[#92b7c9]">Фильтры аудита</h1>
+                </div>
+                <div class="space-y-4">
+                    <div class="space-y-1.5">
+                        <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Хост</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">computer</span>
+                            <select id="hostFilter" class="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-md focus:ring-1 focus:ring-primary">
+                                <option value="">Все хосты</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Важность</label>
+                        <select id="severityFilter" class="w-full pl-3 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-md focus:ring-1 focus:ring-primary">
+                            <option value="">Все</option>
+                            <option value="emerg">Аварийная</option>
+                            <option value="alert">Тревога</option>
+                            <option value="crit">Критическая</option>
+                            <option value="err">Ошибка</option>
+                            <option value="warn">Предупреждение</option>
+                            <option value="notice">Уведомление</option>
+                            <option value="info">Информация</option>
+                            <option value="debug">Отладка</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Период</label>
+                        <select id="timeFilter" class="w-full pl-3 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-md focus:ring-1 focus:ring-primary">
+                            <option value="1h">Последний час</option>
+                            <option value="6h">Последние 6 часов</option>
+                            <option value="24h" selected>Последние 24 часа</option>
+                            <option value="7d">Последние 7 дней</option>
+                            <option value="custom">Произвольный период</option>
+                        </select>
+                        <div id="customDateRange" class="hidden space-y-2">
+                            <input id="dateFrom" type="datetime-local" class="w-full pl-3 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-md">
+                            <input id="dateTo" type="datetime-local" class="w-full pl-3 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-md">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-6 border-t border-slate-200 dark:border-[#233c48]">
+                <h3 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-[#92b7c9] mb-4">Быстрые наборы</h3>
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between px-3 py-2 text-sm text-slate-600 dark:text-slate-300 bg-primary/10 rounded-md border-l-2 border-primary">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-base">window</span>
+                            <span>WinEvent: Security</span>
+                        </div>
+                        <span class="text-[10px] font-mono opacity-60">4.2k</span>
+                    </div>
+                    <div class="flex items-center justify-between px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md cursor-pointer transition-colors">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-base">dns</span>
+                            <span>Syslog (Linux)</span>
+                        </div>
+                        <span class="text-[10px] font-mono opacity-60">1.8k</span>
+                    </div>
+                    <div class="flex items-center justify-between px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md cursor-pointer transition-colors">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-base">lock_reset</span>
+                            <span>Ошибки входа</span>
+                        </div>
+                        <span class="text-[10px] font-mono opacity-60">241</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pt-6 border-t border-slate-200 dark:border-[#233c48]">
+            <button id="settingsSidebarBtn" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md transition-colors">
+                <span class="material-symbols-outlined text-base">settings</span>
+                Настройки
+            </button>
         </div>
     </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-        <div class="dashboard-header">
-            <div class="header-top">
-                <div>
-                    <h2>Журналы событий</h2>
-                    <p class="powered-by">Просмотр и фильтрация событий системы</p>
+    <main class="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+        <div class="p-4 space-y-4 border-b border-slate-200 dark:border-[#233c48] bg-white dark:bg-background-dark">
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex-1 relative">
+                    <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#92b7c9]">
+                        <span class="material-symbols-outlined">search</span>
+                    </div>
+                    <input id="searchInput" class="w-full bg-slate-100 dark:bg-[#233c48] border-none rounded-lg py-3 pl-12 pr-12 text-sm font-mono focus:ring-2 focus:ring-primary" placeholder="Поиск по журналам (например, EventID:4625)" type="text"/>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="refreshBtn" class="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-bold px-6 py-3 rounded-lg transition-all shadow-lg shadow-primary/20">
+                        <span class="material-symbols-outlined">play_arrow</span>
+                        <span>АНАЛИЗ</span>
+                    </button>
+                    <button id="exportBtn" class="p-2 text-slate-500 dark:text-[#92b7c9] hover:bg-slate-100 dark:hover:bg-[#233c48] rounded transition-colors" title="Экспорт CSV">
+                        <span class="material-symbols-outlined">download</span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex justify-between items-center">
+                <div class="flex gap-2">
+                    <button class="px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-[#233c48] border border-slate-200 dark:border-[#233c48] rounded flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-[#2d4a58] transition-colors">
+                        <span class="material-symbols-outlined text-[16px]">history</span>
+                        <span>Последний час</span>
+                    </button>
+                </div>
+                <div class="flex items-center gap-3 text-xs font-medium text-slate-500 dark:text-[#92b7c9]">
+                    <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Поток активен</span>
+                    <span class="opacity-30">|</span>
+                    <span id="table-info">Загрузка...</span>
                 </div>
             </div>
         </div>
-
-        <!-- Logs Table -->
-        <div class="logs-section">
-            <div class="logs-header">
-                <h3>События</h3>
-                <div class="logs-controls">
-                    <select id="hostFilter" class="filter-select">
-                        <option value="">Все хосты</option>
-                    </select>
-                    <input type="text" id="searchInput" placeholder="Поиск..." class="search-input">
-                    <select id="severityFilter" class="filter-select">
-                        <option value="">Все уровни важности</option>
-                        <option value="emerg">Аварийная</option>
-                        <option value="alert">Тревога</option>
-                        <option value="crit">Критическая</option>
-                        <option value="err">Ошибка</option>
-                        <option value="warn">Предупреждение</option>
-                        <option value="notice">Уведомление</option>
-                        <option value="info">Информация</option>
-                        <option value="debug">Отладка</option>
-                    </select>
-                    <select id="timeFilter" class="filter-select">
-                        <option value="">Все время</option>
-                        <option value="1h">Последний час</option>
-                        <option value="6h">Последние 6 часов</option>
-                        <option value="24h">Последние 24 часа</option>
-                        <option value="7d">Последние 7 дней</option>
-                        <option value="custom">Произвольный период</option>
-                    </select>
-                    <div id="customDateRange" class="custom-date-range" style="display: none;">
-                        <input type="datetime-local" id="dateFrom" class="date-input">
-                        <span>—</span>
-                        <input type="datetime-local" id="dateTo" class="date-input">
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="bg-white dark:bg-[#1a2b34] rounded-xl border border-slate-200 dark:border-[#233c48] overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[1000px]">
+                        <thead class="bg-slate-50 dark:bg-[#233c48]/50 border-b border-slate-200 dark:border-[#233c48]">
+                            <tr>
+                                <th class="px-4 py-3 text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase sortable" data-sort="ts">Время</th>
+                                <th class="px-4 py-3 text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase sortable" data-sort="severity">Важность</th>
+                                <th class="px-4 py-3 text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase sortable" data-sort="host">Хост</th>
+                                <th class="px-4 py-3 text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase sortable" data-sort="unit">Служба</th>
+                                <th class="px-4 py-3 text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase sortable" data-sort="pid">PID</th>
+                                <th class="px-4 py-3 text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase">Сообщение</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-[#233c48]" id="logsTableBody">
+                            <tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-3 border-t border-slate-200 dark:border-[#233c48] flex items-center justify-between bg-slate-50 dark:bg-[#1a2b34]">
+                    <div class="text-[10px] font-bold text-slate-500 dark:text-[#92b7c9] uppercase" id="pageInfo">Страница 1</div>
+                    <div class="flex gap-2">
+                        <button id="prevPage" class="px-3 py-1 text-[10px] font-bold rounded bg-slate-200 dark:bg-[#233c48] hover:bg-primary hover:text-white transition-all">Назад</button>
+                        <button id="nextPage" class="px-3 py-1 text-[10px] font-bold rounded bg-primary text-white transition-all shadow-md shadow-primary/20">Вперед</button>
                     </div>
-                    <button id="refreshBtn" class="btn-primary">Обновить</button>
-                    <button id="exportBtn" class="btn-secondary">Экспорт CSV</button>
                 </div>
-            </div>
-            <div class="table-info">
-                <span id="table-info">Загрузка...</span>
-                <div class="pagination-controls">
-                    <button id="prevPage" class="pagination-btn" disabled>‹</button>
-                    <span id="pageInfo">Страница 1</span>
-                    <button id="nextPage" class="pagination-btn">›</button>
-                </div>
-            </div>
-            <div class="table-container">
-                <table class="logs-table" id="logsTable">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-sort="ts">Время ↕</th>
-                            <th class="sortable" data-sort="severity">Важность ↕</th>
-                            <th class="sortable" data-sort="host">Хост ↕</th>
-                            <th class="sortable" data-sort="unit">Служба ↕</th>
-                            <th class="sortable" data-sort="pid">PID ↕</th>
-                            <th>Сообщение</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logsTableBody">
-                        <!-- Will be populated by JS -->
-                    </tbody>
-                </table>
             </div>
         </div>
     </main>
-
-    <!-- Modal for Event Details -->
-    <div id="eventModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Детали события</h3>
-                <span class="modal-close" id="modalClose">&times;</span>
+</div>
+<div id="eventModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+    <div class="bg-white dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Детали события</h3>
+            <button id="modalClose" class="text-slate-500 hover:text-primary"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div id="modalBody" class="space-y-3 text-sm text-slate-700 dark:text-slate-200"></div>
+    </div>
+</div>
+<div id="settingsModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+    <div class="bg-white dark:bg-[#1a2b34] border border-slate-200 dark:border-[#233c48] rounded-xl p-6 max-w-md w-full mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Настройки</h3>
+            <button id="settingsClose" class="text-slate-500 hover:text-primary"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-500 mb-2">Интервал автообновления</label>
+                <select id="refreshInterval" class="w-full bg-slate-100 dark:bg-[#233c48] border-none rounded-lg px-3 py-2 text-sm">
+                    <option value="10">10 секунд</option>
+                    <option value="30" selected>30 секунд</option>
+                    <option value="60">1 минута</option>
+                    <option value="300">5 минут</option>
+                    <option value="0">Отключено</option>
+                </select>
             </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Will be populated by JS -->
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="autoRefreshEnabled" checked class="rounded">
+                <label for="autoRefreshEnabled" class="text-sm">Включить автообновление</label>
             </div>
         </div>
     </div>
-
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Настройки</h3>
-                <span class="modal-close" id="settingsClose">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="settings-section">
-                    <h4>Автообновление</h4>
-                    <div class="setting-item">
-                        <label>Интервал обновления:</label>
-                        <select id="refreshInterval" class="filter-select">
-                            <option value="10">10 секунд</option>
-                            <option value="30" selected>30 секунд</option>
-                            <option value="60">1 минута</option>
-                            <option value="300">5 минут</option>
-                            <option value="0">Отключено</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label>
-                            <input type="checkbox" id="autoRefreshEnabled" checked>
-                            Автоматическое обновление
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="/static/logs.js"></script>
+</div>
+<script src="/static/logs.js"></script>
 </body>
 </html>
-

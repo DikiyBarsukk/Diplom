@@ -35,9 +35,9 @@ async function checkAuth() {
         
         if (response.ok) {
             const user = await response.json();
-            document.getElementById('username').textContent = user.username || 'Администратор';
+            document.getElementById('username').textContent = user.username || 'Аудитор';
             
-            // Update alert count
+            // Обновляем счетчик критических событий
             const statsResponse = await authenticatedFetch(`${API_BASE}/stats`);
             const stats = await statsResponse.json();
             const severityCounts = stats.severity || {};
@@ -151,7 +151,7 @@ async function loadAnalytics() {
         
         updateCharts(stats, events);
         
-        // Update alert count
+        // Обновляем счетчик критических событий
         const severityCounts = stats.severity || {};
         const criticalCount = (severityCounts.emerg || 0) + 
                              (severityCounts.alert || 0) + 
@@ -392,7 +392,7 @@ function updateSeveritiesChart(stats) {
     
     const severityTranslations = {
         'emerg': 'АВАРИЙНАЯ',
-        'alert': 'ТРЕВОГА',
+        'alert': 'ОПОВЕЩЕНИЕ',
         'crit': 'КРИТИЧЕСКАЯ',
         'err': 'ОШИБКА',
         'warn': 'ПРЕДУПРЕЖДЕНИЕ',

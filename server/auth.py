@@ -209,58 +209,58 @@ class AuthManager:
             self.rate_limiter.record_attempt(rate_limit_key, False)
             return None, f"Слишком много неудачных попыток. Попробуйте через {retry_after} секунд"
         
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Проверяем блокировку аккаунта
-        cursor.execute("""
-            SELECT id, username, role, password_hash, locked_until, failed_login_attempts
-            FROM users WHERE username = ?
-        """, (username,))
-        
-        user_row = cursor.fetchone()
-        
-        if not user_row:
-            # Пользователь не найден - все равно проверяем пароль для защиты от timing attacks
-            # Используем фиктивный хеш для постоянного времени выполнения
-            dummy_hash = PasswordSecurity.hash_password("dummy")
-            PasswordSecurity.verify_password(password, dummy_hash)
-            self.rate_limiter.record_attempt(rate_limit_key, False)
-            conn.close()
-            return None, "Неверное имя пользователя или пароль"
-        
-        user_id, db_username, role, password_hash, locked_until, failed_attempts = user_row
-        
-        # Проверяем блокировку аккаунта
-        if locked_until:
-            lock_time = datetime.fromisoformat(locked_until)
-            if lock_time > datetime.utcnow():
-                remaining_seconds = int((lock_time - datetime.utcnow()).total_seconds())
-                conn.close()
-                return None, f"Аккаунт заблокирован. Попробуйте через {remaining_seconds} секунд"
-        
-        # Проверяем пароль с защитой от timing attacks
-        is_valid = PasswordSecurity.verify_password(password, password_hash)
-        
-        if is_valid:
-            # Успешная аутентификация
-            now = datetime.utcnow().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Проверяем блокировку аккаунта
             cursor.execute("""
-                UPDATE users 
-                SET last_login = ?, failed_login_attempts = 0, locked_until = NULL
-                WHERE id = ?
-            """, (now, user_id))
-            conn.commit()
-            conn.close()
+                SELECT id, username, role, password_hash, locked_until, failed_login_attempts
+                FROM users WHERE username = ?
+            """, (username,))
             
-            self.rate_limiter.record_attempt(rate_limit_key, True)
+            user_row = cursor.fetchone()
             
-            return {
-                "id": user_id,
-                "username": db_username,
-                "role": role
-            }, None
-        else:
+            if not user_row:
+                # Пользователь не найден - все равно проверяем пароль для защиты от timing attacks
+                # Используем фиктивный хеш для постоянного времени выполнения
+                dummy_hash = PasswordSecurity.hash_password("dummy")
+                PasswordSecurity.verify_password(password, dummy_hash)
+                self.rate_limiter.record_attempt(rate_limit_key, False)
+                return None, "Неверное имя пользователя или пароль"
+            
+            user_id, db_username, role, password_hash, locked_until, failed_attempts = user_row
+            
+            # Проверяем блокировку аккаунта
+            if locked_until:
+                try:
+                    lock_time = datetime.fromisoformat(locked_until)
+                except Exception:
+                    lock_time = None
+                if lock_time and lock_time > datetime.utcnow():
+                    remaining_seconds = int((lock_time - datetime.utcnow()).total_seconds())
+                    return None, f"Аккаунт заблокирован. Попробуйте через {remaining_seconds} секунд"
+            
+            # Проверяем пароль с защитой от timing attacks
+            is_valid = PasswordSecurity.verify_password(password, password_hash)
+            
+            if is_valid:
+                # Успешная аутентификация
+                now = datetime.utcnow().isoformat()
+                cursor.execute("""
+                    UPDATE users 
+                    SET last_login = ?, failed_login_attempts = 0, locked_until = NULL
+                    WHERE id = ?
+                """, (now, user_id))
+                conn.commit()
+                
+                self.rate_limiter.record_attempt(rate_limit_key, True)
+                
+                return {
+                    "id": user_id,
+                    "username": db_username,
+                    "role": role
+                }, None
+            
             # Неудачная аутентификация
             failed_attempts += 1
             locked_until = None
@@ -275,7 +275,6 @@ class AuthManager:
                 WHERE id = ?
             """, (failed_attempts, locked_until, user_id))
             conn.commit()
-            conn.close()
             
             self.rate_limiter.record_attempt(rate_limit_key, False)
             
@@ -304,21 +303,20 @@ class AuthManager:
         expires_at = datetime.utcnow() + timedelta(hours=24)
         now = datetime.utcnow().isoformat()
         
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Инвалидируем старые сессии пользователя (ротация сессий)
-        cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-        
-        cursor.execute("""
-            INSERT INTO sessions (user_id, token, csrf_token, expires_at, 
-                                ip_address, user_agent, last_activity)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, session_token, csrf_token, expires_at.isoformat(),
-              ip_address, user_agent, now))
-        
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Инвалидируем старые сессии пользователя (ротация сессий)
+            cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            
+            cursor.execute("""
+                INSERT INTO sessions (user_id, token, csrf_token, expires_at, 
+                                    ip_address, user_agent, last_activity)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, session_token, csrf_token, expires_at.isoformat(),
+                  ip_address, user_agent, now))
+            
+            conn.commit()
         
         return {
             "session_token": session_token,
@@ -336,49 +334,47 @@ class AuthManager:
         Returns:
             Информация о пользователе или None
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Удаляем истекшие сессии
-        cursor.execute("DELETE FROM sessions WHERE expires_at < ?", 
-                      (datetime.utcnow().isoformat(),))
-        
-        cursor.execute("""
-            SELECT s.user_id, u.username, u.role, s.csrf_token, s.last_activity
-            FROM sessions s
-            JOIN users u ON s.user_id = u.id
-            WHERE s.token = ? AND s.expires_at > ?
-        """, (token, datetime.utcnow().isoformat()))
-        
-        result = cursor.fetchone()
-        
-        if result:
-            user_id, username, role, csrf_token, last_activity = result
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
             
-            # Обновляем время активности (не чаще раза в минуту)
-            if update_activity:
-                try:
-                    last_activity_time = datetime.fromisoformat(last_activity)
-                    if (datetime.utcnow() - last_activity_time).total_seconds() > 60:
-                        cursor.execute("""
-                            UPDATE sessions SET last_activity = ? WHERE token = ?
-                        """, (datetime.utcnow().isoformat(), token))
-                except Exception:
-                    pass
+            # Удаляем истекшие сессии
+            cursor.execute("DELETE FROM sessions WHERE expires_at < ?", 
+                          (datetime.utcnow().isoformat(),))
+            
+            cursor.execute("""
+                SELECT s.user_id, u.username, u.role, s.csrf_token, s.last_activity
+                FROM sessions s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.token = ? AND s.expires_at > ?
+            """, (token, datetime.utcnow().isoformat()))
+            
+            result = cursor.fetchone()
+            
+            if result:
+                user_id, username, role, csrf_token, last_activity = result
+                
+                # Обновляем время активности (не чаще раза в минуту)
+                if update_activity:
+                    try:
+                        last_activity_time = datetime.fromisoformat(last_activity)
+                        if (datetime.utcnow() - last_activity_time).total_seconds() > 60:
+                            cursor.execute("""
+                                UPDATE sessions SET last_activity = ? WHERE token = ?
+                            """, (datetime.utcnow().isoformat(), token))
+                    except Exception:
+                        pass
+                
+                conn.commit()
+                
+                return {
+                    "id": user_id,
+                    "username": username,
+                    "role": role,
+                    "csrf_token": csrf_token
+                }
             
             conn.commit()
-            conn.close()
-            
-            return {
-                "id": user_id,
-                "username": username,
-                "role": role,
-                "csrf_token": csrf_token
-            }
-        
-        conn.commit()
-        conn.close()
-        return None
+            return None
     
     def validate_csrf_token(self, session_token: str, csrf_token: str) -> bool:
         """

@@ -1,180 +1,338 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html class="dark" lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления аудитом - Аналитика</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Отчеты и аналитика | BARSUKSIEM</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13a4ec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101c22",
+                        "card-dark": "#1a2a32",
+                        "border-dark": "#233c48",
+                        "text-muted": "#92b7c9",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .widget-ghost {
+            background-image: radial-gradient(#233c48 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
 </head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-left">
-            <h1 class="app-title">Панель управления аудитом</h1>
-        </div>
-        <div class="header-right">
-            <div class="header-controls">
-                <button id="themeToggle" class="theme-toggle" title="Переключить тему">🌙</button>
-                <button id="settingsBtn" class="settings-btn" title="Настройки">⚙️</button>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-border-dark bg-background-dark px-10 py-3 sticky top-0 z-50">
+    <div class="flex items-center gap-8">
+        <div class="flex items-center gap-3 text-white">
+            <div class="size-8 bg-primary rounded-lg flex items-center justify-center">
+                <span class="material-symbols-outlined text-white">shield_with_heart</span>
             </div>
-            <div class="notifications">
-                <span class="notification-icon">🔔</span>
-                <span class="notification-badge" id="alert-count">0</span>
-            </div>
-            <div class="user-info">
-                <span class="username" id="username">Администратор</span>
-                <button id="logoutBtn" class="logout-btn" title="Выход">Выход</button>
-            </div>
-            <nav class="breadcrumb">
-                <span>Панели управления</span> > <span class="current">Аналитика</span>
-            </nav>
+            <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">BARSUKSIEM</h2>
         </div>
-    </header>
-
-    <!-- Sidebar -->
-    <aside class="sidebar">
-        <a href="/" class="sidebar-icon" title="Панель управления">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-            </svg>
-        </a>
-        <a href="/logs" class="sidebar-icon" title="Журналы">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-            </svg>
-        </a>
-        <a href="/analytics" class="sidebar-icon active" title="Аналитика">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
-            </svg>
-        </a>
-        <div class="sidebar-icon" id="settingsSidebarBtn" title="Настройки">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-            </svg>
+        <nav class="flex items-center gap-6">
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/">Дашборд</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/incidents">События ИБ</a>
+            <a class="text-white text-sm font-bold border-b-2 border-primary pb-1" href="/analytics">Отчеты</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/logs">Журналы</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="#">Настройки</a>
+        </nav>
+    </div>
+    <div class="flex flex-1 justify-end gap-4 items-center">
+        <label class="flex flex-col min-w-40 h-9 max-w-64">
+            <div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+                <div class="text-text-muted flex border-none bg-border-dark items-center justify-center pl-3 rounded-l-lg">
+                    <span class="material-symbols-outlined text-[20px]">search</span>
+                </div>
+                <input id="reportsSearch" class="form-input flex w-full min-w-0 flex-1 border-none bg-border-dark text-white focus:ring-0 h-full placeholder:text-text-muted px-3 rounded-r-lg text-sm" placeholder="Поиск отчетов..." value=""/>
+            </div>
+        </label>
+        <div class="flex gap-2">
+            <button id="previewReportBtn" class="flex items-center justify-center rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold hover:bg-opacity-90 transition-all">
+                <span>Предпросмотр</span>
+            </button>
+            <button id="saveDraftBtn" class="flex items-center justify-center rounded-lg h-9 px-4 bg-border-dark text-white text-sm font-bold hover:bg-slate-700 transition-all">
+                <span>Сохранить черновик</span>
+            </button>
         </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-        <div class="dashboard-header">
-            <div class="header-top">
-                <div>
-                    <h2>Аналитика</h2>
-                    <p class="powered-by">Визуализация и анализ событий системы</p>
+        <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-9 border border-border-dark flex items-center justify-center">
+            <span class="material-symbols-outlined text-text-muted">person</span>
+        </div>
+    </div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+    <!-- Left Sidebar: Template Gallery -->
+    <aside class="w-64 border-r border-border-dark flex flex-col bg-background-dark overflow-y-auto">
+        <div class="p-6">
+            <h1 class="text-white text-sm font-bold uppercase tracking-wider mb-1">Галерея шаблонов</h1>
+            <p class="text-text-muted text-xs mb-6">Готовые структуры отчетов</p>
+            <div class="space-y-1">
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">verified_user</span>
+                    <span class="text-sm font-medium">PCI DSS 4.0</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">medical_services</span>
+                    <span class="text-sm font-medium">HIPAA Compliance</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/20 text-primary border border-primary/30 text-left">
+                    <span class="material-symbols-outlined text-[20px] fill-current">calendar_month</span>
+                    <span class="text-sm font-bold">Ежемесячный обзор</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">monitoring</span>
+                    <span class="text-sm font-medium">Ежедневный аудит</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">local_fire_department</span>
+                    <span class="text-sm font-medium">Топ 10 событий</span>
+                </button>
+            </div>
+            <div class="mt-10">
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 px-3">Виджеты</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-grab active:cursor-grabbing hover:border-primary transition-colors p-2">
+                        <span class="material-symbols-outlined text-text-muted">bar_chart</span>
+                        <span class="text-[10px] text-text-muted text-center font-medium">Гистограмма</span>
+                    </div>
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-grab active:cursor-grabbing hover:border-primary transition-colors p-2">
+                        <span class="material-symbols-outlined text-text-muted">pie_chart</span>
+                        <span class="text-[10px] text-text-muted text-center font-medium">Круговая диаграмма</span>
+                    </div>
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-grab active:cursor-grabbing hover:border-primary transition-colors p-2">
+                        <span class="material-symbols-outlined text-text-muted">table_rows</span>
+                        <span class="text-[10px] text-text-muted text-center font-medium">Таблица данных</span>
+                    </div>
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-grab active:cursor-grabbing hover:border-primary transition-colors p-2">
+                        <span class="material-symbols-outlined text-text-muted">public</span>
+                        <span class="text-[10px] text-text-muted text-center font-medium">Карта активности</span>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <!-- Charts Row -->
-        <div class="charts-row">
-            <!-- Severity Breakdown -->
-            <div class="chart-container">
-                <h3>Распределение по важности</h3>
-                <canvas id="severityChart"></canvas>
+    </aside>
+    <!-- Main Content: Report Builder -->
+    <main class="flex-1 flex flex-col overflow-y-auto widget-ghost">
+        <div class="flex items-center gap-2 px-8 py-4 bg-background-dark/50 backdrop-blur-sm border-b border-border-dark">
+            <a class="text-text-muted text-xs font-medium hover:text-white" href="#">Отчеты</a>
+            <span class="text-text-muted text-xs font-medium">/</span>
+            <span class="text-white text-xs font-bold">Ежемесячный обзор — Октябрь 2023 (черновик)</span>
+            <span class="ml-auto flex items-center gap-2 text-[10px] text-text-muted">
+                <span class="size-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                Автосохранение 2 мин назад
+            </span>
+        </div>
+        <div class="flex flex-wrap justify-between items-center gap-3 px-8 py-6">
+            <div class="flex flex-col gap-1">
+                <p class="text-white text-3xl font-black leading-tight tracking-tight">Ежемесячный отчет по аудиту</p>
+                <p class="text-text-muted text-sm font-normal">Перетащите виджеты для настройки отчета по журналам удаленного ПК</p>
             </div>
-
-            <!-- Risk Heat Map -->
-            <div class="chart-container">
-                <h3>Тепловая карта событий</h3>
-                <div class="heatmap-container">
-                    <table class="heatmap-table" id="heatmapTable">
-                        <thead>
+            <button id="addWidgetBtn" class="flex items-center gap-2 rounded-lg h-10 px-5 bg-primary text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(19,164,236,0.3)] transition-all">
+                <span class="material-symbols-outlined text-[20px]">add</span>
+                <span>Добавить виджет</span>
+            </button>
+        </div>
+        <div class="p-8 space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="flex flex-col gap-4 rounded-xl border border-border-dark bg-card-dark p-6 group relative">
+                    <div class="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-1 hover:bg-border-dark rounded"><span class="material-symbols-outlined text-[18px] text-text-muted">drag_indicator</span></button>
+                        <button class="p-1 hover:bg-border-dark rounded"><span class="material-symbols-outlined text-[18px] text-text-muted">settings</span></button>
+                    </div>
+                    <div class="flex flex-col">
+                        <p class="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">Всего критических событий</p>
+                        <div class="flex items-baseline gap-3">
+                            <p class="text-white text-4xl font-black tracking-tight" id="criticalTotal">0</p>
+                            <span class="text-emerald-400 text-sm font-bold flex items-center gap-0.5" id="criticalTrend">
+                                <span class="material-symbols-outlined text-[16px]">trending_up</span>
+                                0%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="grid min-h-[220px] grid-flow-col gap-4 grid-rows-[1fr_auto] items-end justify-items-center pt-6">
+                        <div class="bg-primary/40 border-t-4 border-primary w-full rounded-t-sm" style="height: 100%;"></div>
+                        <p class="text-text-muted text-[11px] font-bold mt-2">Вредоносное ПО</p>
+                        <div class="bg-primary/40 border-t-4 border-primary w-full rounded-t-sm" style="height: 85%;"></div>
+                        <p class="text-text-muted text-[11px] font-bold mt-2">Фишинг</p>
+                        <div class="bg-primary/40 border-t-4 border-primary w-full rounded-t-sm" style="height: 60%;"></div>
+                        <p class="text-text-muted text-[11px] font-bold mt-2">DDoS</p>
+                        <div class="bg-primary/40 border-t-4 border-primary w-full rounded-t-sm" style="height: 45%;"></div>
+                        <p class="text-text-muted text-[11px] font-bold mt-2">SQLi</p>
+                        <div class="bg-primary/40 border-t-4 border-primary w-full rounded-t-sm" style="height: 30%;"></div>
+                        <p class="text-text-muted text-[11px] font-bold mt-2">Ошибки входа</p>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-4 rounded-xl border border-border-dark bg-card-dark p-6 group relative">
+                    <div class="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-1 hover:bg-border-dark rounded"><span class="material-symbols-outlined text-[18px] text-text-muted">drag_indicator</span></button>
+                        <button class="p-1 hover:bg-border-dark rounded"><span class="material-symbols-outlined text-[18px] text-text-muted">settings</span></button>
+                    </div>
+                    <div class="flex flex-col">
+                        <p class="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">Индекс риска в реальном времени</p>
+                        <div class="flex items-baseline gap-3">
+                            <p class="text-white text-4xl font-black tracking-tight" id="riskLevel">ВЫСОКИЙ</p>
+                            <span class="text-red-400 text-sm font-bold flex items-center gap-0.5" id="riskHint">
+                                <span class="material-symbols-outlined text-[16px]">warning</span>
+                                Критическая зона
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex min-h-[220px] flex-col gap-4 pt-6">
+                        <svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 472 150">
+                            <path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 25 472 25V149H0V109Z" fill="url(#blue_gradient)"></path>
+                            <path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 25 472 25" stroke="#13a4ec" stroke-linecap="round" stroke-width="3"></path>
+                            <defs>
+                                <linearGradient id="blue_gradient" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="#13a4ec" stop-opacity="0.3"></stop>
+                                    <stop offset="100%" stop-color="#13a4ec" stop-opacity="0"></stop>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="flex justify-between px-2">
+                            <p class="text-text-muted text-[10px] font-bold">00:00</p>
+                            <p class="text-text-muted text-[10px] font-bold">08:00</p>
+                            <p class="text-text-muted text-[10px] font-bold">16:00</p>
+                            <p class="text-text-muted text-[10px] font-bold">СЕЙЧАС</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-card-dark border border-border-dark rounded-xl overflow-hidden group relative">
+                <div class="p-6 border-b border-border-dark flex justify-between items-center">
+                    <h3 class="text-white font-bold text-lg">Журнал событий ИБ (детали)</h3>
+                    <button class="text-primary text-sm font-bold flex items-center gap-1">
+                        <span>Фильтр</span>
+                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-background-dark/50 text-text-muted font-bold uppercase text-[10px] tracking-widest">
                             <tr>
-                                <th></th>
-                                <th>Редко</th>
-                                <th>Маловероятно</th>
-                                <th>Умеренно</th>
-                                <th>Вероятно</th>
-                                <th>Почти наверняка</th>
+                                <th class="px-6 py-4">Статус</th>
+                                <th class="px-6 py-4">Время</th>
+                                <th class="px-6 py-4">Тип события</th>
+                                <th class="px-6 py-4">Источник</th>
+                                <th class="px-6 py-4">Важность</th>
+                                <th class="px-6 py-4 text-right">Действие</th>
                             </tr>
                         </thead>
-                        <tbody id="heatmapBody">
-                            <!-- Will be populated by JS -->
+                        <tbody class="divide-y divide-border-dark" id="reportTableBody">
+                            <tr>
+                                <td colspan="6" class="px-6 py-6 text-text-muted text-sm">Загрузка данных...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-
-            <!-- Action Plan Breakdown -->
-            <div class="chart-container">
-                <h3>Распределение по статусам</h3>
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Timeline Chart -->
-        <div class="timeline-section">
-            <div class="chart-container full-width">
-                <div class="chart-header">
-                    <h3>График событий по времени</h3>
-                    <div class="chart-controls">
-                        <select id="timelinePeriod" class="filter-select">
-                            <option value="24h">Последние 24 часа</option>
-                            <option value="7d">Последние 7 дней</option>
-                            <option value="30d">Последние 30 дней</option>
-                        </select>
-                    </div>
-                </div>
-                <canvas id="timelineChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Bottom Charts -->
-        <div class="bottom-charts">
-            <!-- Top 5 Hosts -->
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h3># Критических событий: Топ-5 хостов</h3>
-                    <button class="export-btn" onclick="exportChart('hostsChart', 'hosts')" title="Экспорт графика">📥</button>
-                </div>
-                <canvas id="hostsChart"></canvas>
-            </div>
-
-            <!-- Top 5 Severities -->
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h3># Критических событий: Топ-5 уровней важности</h3>
-                    <button class="export-btn" onclick="exportChart('severitiesChart', 'severities')" title="Экспорт графика">📥</button>
-                </div>
-                <canvas id="severitiesChart"></canvas>
-            </div>
         </div>
     </main>
-
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Настройки</h3>
-                <span class="modal-close" id="settingsClose">&times;</span>
+    <!-- Right Sidebar: Configuration -->
+    <aside class="w-72 border-l border-border-dark bg-background-dark overflow-y-auto">
+        <div class="p-6 space-y-8">
+            <div>
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">schedule</span>
+                    Расписание формирования
+                </h3>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-border-dark hover:border-primary/50 cursor-pointer bg-card-dark transition-all">
+                        <input class="text-primary focus:ring-primary bg-background-dark border-border-dark" name="schedule" type="radio"/>
+                        <span class="text-sm font-medium text-white">Ежедневно</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-border-dark hover:border-primary/50 cursor-pointer bg-card-dark transition-all">
+                        <input class="text-primary focus:ring-primary bg-background-dark border-border-dark" name="schedule" type="radio"/>
+                        <span class="text-sm font-medium text-white">Еженедельно</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-primary bg-primary/10 cursor-pointer transition-all">
+                        <input checked class="text-primary focus:ring-primary bg-background-dark border-primary" name="schedule" type="radio"/>
+                        <span class="text-sm font-bold text-white">Ежемесячно</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-border-dark hover:border-primary/50 cursor-pointer bg-card-dark transition-all">
+                        <input class="text-primary focus:ring-primary bg-background-dark border-border-dark" name="schedule" type="radio"/>
+                        <span class="text-sm font-medium text-white">Пользовательский</span>
+                    </label>
+                </div>
             </div>
-            <div class="modal-body">
-                <div class="settings-section">
-                    <h4>Автообновление</h4>
-                    <div class="setting-item">
-                        <label>Интервал обновления:</label>
-                        <select id="refreshInterval" class="filter-select">
-                            <option value="10">10 секунд</option>
-                            <option value="30" selected>30 секунд</option>
-                            <option value="60">1 минута</option>
-                            <option value="300">5 минут</option>
-                            <option value="0">Отключено</option>
-                        </select>
+            <div>
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">file_download</span>
+                    Формат экспорта
+                </h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary bg-primary/10 text-white text-xs font-bold">
+                        <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                        PDF
+                    </button>
+                    <button class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-border-dark bg-card-dark text-text-muted hover:text-white hover:border-primary/50 text-xs font-bold">
+                        <span class="material-symbols-outlined text-[16px]">table_chart</span>
+                        CSV
+                    </button>
+                    <button class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-border-dark bg-card-dark text-text-muted hover:text-white hover:border-primary/50 text-xs font-bold">
+                        <span class="material-symbols-outlined text-[16px]">javascript</span>
+                        JSON
+                    </button>
+                    <button class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-border-dark bg-card-dark text-text-muted hover:text-white hover:border-primary/50 text-xs font-bold">
+                        <span class="material-symbols-outlined text-[16px]">terminal</span>
+                        XML
+                    </button>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">mail</span>
+                    Рассылка по почте
+                </h3>
+                <div class="space-y-3">
+                    <div class="relative">
+                        <input class="w-full bg-card-dark border-border-dark rounded-lg text-sm text-white placeholder:text-text-muted focus:ring-primary focus:border-primary pr-10" placeholder="Добавить email..." type="text"/>
+                        <button class="absolute right-2 top-1.5 p-1 text-primary hover:bg-primary/20 rounded">
+                            <span class="material-symbols-outlined text-[18px]">add</span>
+                        </button>
                     </div>
-                    <div class="setting-item">
-                        <label>
-                            <input type="checkbox" id="autoRefreshEnabled" checked>
-                            Автоматическое обновление
-                        </label>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-border-dark text-[11px] font-bold text-white">
+                            auditor@barsuksiem.local
+                            <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-border-dark text-[11px] font-bold text-white">
+                            admin@barsuksiem.local
+                            <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+                        </span>
                     </div>
                 </div>
             </div>
+            <button id="generateReportBtn" class="w-full py-4 bg-primary text-white font-black text-sm rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">rocket_launch</span>
+                СФОРМИРОВАТЬ ОТЧЕТ
+            </button>
         </div>
-    </div>
-
-    <script src="/static/analytics.js"></script>
+    </aside>
+</div>
+<script src="/static/reports.js"></script>
 </body>
 </html>
-

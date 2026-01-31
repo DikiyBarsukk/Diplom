@@ -5,7 +5,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -445,6 +445,46 @@ class LogStorage:
             stats["last_event_time"] = last_ts
 
             return stats
+
+    def get_agent_stats(self, window_minutes: int = 5) -> Dict[str, Any]:
+        """
+        Возвращает статистику по агентам (онлайн/оффлайн).
+
+        Онлайн определяется по наличию события в окне window_minutes.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT host, MAX(ts) FROM events GROUP BY host")
+            rows = cursor.fetchall()
+
+        now = datetime.now(timezone.utc)
+        online = 0
+        last_seen: Dict[str, Any] = {}
+
+        for host, ts in rows:
+            last_seen[host] = ts
+            if not ts:
+                continue
+            try:
+                ts_value = ts.replace("Z", "+00:00") if isinstance(ts, str) else ts
+                dt = datetime.fromisoformat(ts_value)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if now - dt <= timedelta(minutes=window_minutes):
+                    online += 1
+            except Exception:
+                continue
+
+        total = len(rows)
+        offline = max(total - online, 0)
+
+        return {
+            "total": total,
+            "online": online,
+            "offline": offline,
+            "window_minutes": window_minutes,
+            "last_seen": last_seen,
+        }
     
     def store_incident(self, incident: Dict[str, Any]) -> bool:
         """
@@ -496,6 +536,7 @@ class LogStorage:
         severity: Optional[str] = None,
         status: Optional[str] = None,
         since: Optional[str] = None,
+        search: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
@@ -534,6 +575,19 @@ class LogStorage:
             if since:
                 conditions.append("detected_at >= ?")
                 params.append(since)
+
+            if search:
+                conditions.append(
+                    "("
+                    "LOWER(title) LIKE ? OR "
+                    "LOWER(description) LIKE ? OR "
+                    "LOWER(host) LIKE ? OR "
+                    "LOWER(incident_type) LIKE ? OR "
+                    "LOWER(rule_id) LIKE ?"
+                    ")"
+                )
+                like_value = f"%{search.lower()}%"
+                params.extend([like_value, like_value, like_value, like_value, like_value])
             
             where_clause = ""
             if conditions:

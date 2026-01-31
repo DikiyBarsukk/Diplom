@@ -16,13 +16,14 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
     from fastapi.staticfiles import StaticFiles
     from fastapi.middleware.cors import CORSMiddleware
     from pathlib import Path
+    import os
     import uvicorn
 
     from server.parser import normalize_event
     from server.storage import LogStorage
     from server.auth import AuthManager
     from server.cache import cache
-    from server.security import SecurityHeaders, InputSanitizer
+    from server.security import SecurityHeaders, InputSanitizer, RateLimiter
     from server.incidents import get_analyzer
 
     app = FastAPI(title="Log Audit Server", version="0.4")
@@ -30,6 +31,7 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
     # Инициализация компонентов
     storage = LogStorage(db_path=db_path)
     auth_manager = AuthManager(db_path=db_path)
+    ingest_rate_limiter = RateLimiter()
     incident_analyzer = get_analyzer()
     
     # Security Headers middleware
@@ -43,9 +45,11 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         return response
     
     # CORS middleware (настроен для безопасности)
+    cors_env = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080")
+    allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # В production указать конкретные домены
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
@@ -303,6 +307,19 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
                 "skipped": 0
             }
         """
+        client_ip = get_client_ip(request) if request else "unknown"
+        rate_key = f"ingest:{client_ip}"
+        is_allowed, retry_after = ingest_rate_limiter.check_rate_limit(
+            rate_key, max_attempts=120, window_seconds=60
+        )
+        if not is_allowed:
+            ingest_rate_limiter.record_attempt(rate_key, False)
+            return JSONResponse(
+                {"error": "Rate limit exceeded", "retry_after": retry_after},
+                status_code=429
+            )
+        ingest_rate_limiter.record_attempt(rate_key, False)
+
         if not logs:
             return JSONResponse({"error": "Empty logs list"}, status_code=400)
 
@@ -425,6 +442,7 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         incident_type: str | None = Query(None),
         severity: str | None = Query(None),
         status: str | None = Query(None),
+        search: str | None = Query(None),
         since: str | None = Query(None),
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0),
@@ -438,6 +456,7 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
             incident_type: Фильтр по типу инцидента
             severity: Фильтр по критичности (critical, high, medium, low, info)
             status: Фильтр по статусу (open, closed, investigating)
+            search: Поиск по описанию, хосту и типу
             since: Фильтр по времени обнаружения (ISO формат)
             limit: Максимальное количество инцидентов
             offset: Смещение для пагинации
@@ -449,6 +468,7 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         sanitized_type = None
         sanitized_severity = None
         sanitized_status = None
+        sanitized_search = None
         
         if incident_type:
             sanitized_type = InputSanitizer.sanitize_string(incident_type, max_length=50)
@@ -456,11 +476,14 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
             sanitized_severity = InputSanitizer.sanitize_string(severity, max_length=20)
         if status:
             sanitized_status = InputSanitizer.sanitize_string(status, max_length=20)
+        if search:
+            sanitized_search = InputSanitizer.sanitize_search_query(search)
         
         incidents = storage.get_incidents(
             incident_type=sanitized_type,
             severity=sanitized_severity,
             status=sanitized_status,
+            search=sanitized_search,
             since=since,
             limit=limit,
             offset=offset,
@@ -490,17 +513,17 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         request: Request = None
     ) -> JSONResponse:
         """Получение статистики по инцидентам ИБ."""
-        stats = storage.get_incidents_stats()
-        
-        # Логируем действие
-        client_ip = get_client_ip(request) if request else "unknown"
-        auth_manager.log_action(user['id'], user['username'], "view_incidents_stats", ip_address=client_ip)
-        
         # Кэшируем результат
         cache_key = "incidents_stats"
         cached_result = cache.get(cache_key)
         if cached_result is not None:
             return JSONResponse(cached_result)
+        
+        stats = storage.get_incidents_stats()
+        
+        # Логируем действие
+        client_ip = get_client_ip(request) if request else "unknown"
+        auth_manager.log_action(user['id'], user['username'], "view_incidents_stats", ip_address=client_ip)
         
         cache.set(cache_key, stats, ttl=300)
         return JSONResponse(stats)
@@ -514,19 +537,32 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         Возвращает статистику по логам.
         Требует аутентификации.
         """
+        # Кэшируем результат
+        cache_key = "stats"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return JSONResponse(cached_result)
+        
         stats_data = storage.get_stats()
         
         # Логируем действие
         client_ip = get_client_ip(request) if request else "unknown"
         auth_manager.log_action(user['id'], user['username'], "view_stats", ip_address=client_ip)
         
-        # Кэшируем результат
-        cache_key = "stats"
-        cached_result = cache.get(cache_key)
-        if cached_result is None:
-            cache.set(cache_key, stats_data, ttl=300)
-            return JSONResponse(stats_data)
-        return JSONResponse(cached_result)
+        cache.set(cache_key, stats_data, ttl=300)
+        return JSONResponse(stats_data)
+
+    @app.get("/api/agents/stats")
+    def agent_stats(
+        window_minutes: int = Query(5, ge=1, le=60),
+        user: Dict[str, Any] = Depends(require_auth),
+        request: Request = None
+    ) -> JSONResponse:
+        """Статистика по агентам (онлайн/оффлайн)."""
+        stats_data = storage.get_agent_stats(window_minutes=window_minutes)
+        client_ip = get_client_ip(request) if request else "unknown"
+        auth_manager.log_action(user['id'], user['username'], "view_agent_stats", ip_address=client_ip)
+        return JSONResponse(stats_data)
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(session_token: str = Cookie(None)) -> HTMLResponse:
@@ -563,6 +599,28 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
             return HTMLResponse(content=logs_file.read_text(encoding="utf-8"))
         return HTMLResponse(content="<h1>Logs page not found</h1>", status_code=404)
     
+    @app.get("/incidents", response_class=HTMLResponse)
+    def incidents_page(session_token: str = Cookie(None)) -> HTMLResponse:
+        """Страница управления инцидентами."""
+        if not session_token or not auth_manager.validate_session(session_token):
+            return RedirectResponse(url="/login")
+
+        incidents_file = web_dir / "incidents.html"
+        if incidents_file.exists():
+            return HTMLResponse(content=incidents_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Incidents page not found</h1>", status_code=404)
+
+    @app.get("/incidents/details", response_class=HTMLResponse)
+    def incident_details_page(session_token: str = Cookie(None)) -> HTMLResponse:
+        """Страница деталей инцидента."""
+        if not session_token or not auth_manager.validate_session(session_token):
+            return RedirectResponse(url="/login")
+
+        details_file = web_dir / "incident_details.html"
+        if details_file.exists():
+            return HTMLResponse(content=details_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Incident details page not found</h1>", status_code=404)
+
     @app.get("/analytics", response_class=HTMLResponse)
     def analytics_page(session_token: str = Cookie(None)) -> HTMLResponse:
         """Страница аналитики."""
@@ -581,6 +639,28 @@ def run_server(host: str, port: int, db_path: str = "logs.db",
         if login_file.exists():
             return HTMLResponse(content=login_file.read_text(encoding="utf-8"))
         return HTMLResponse(content="<h1>Login page not found</h1>", status_code=404)
+
+    @app.get("/inventory", response_class=HTMLResponse)
+    def inventory_page(session_token: str = Cookie(None)) -> HTMLResponse:
+        """Страница управления удаленными ПК."""
+        if not session_token or not auth_manager.validate_session(session_token):
+            return RedirectResponse(url="/login")
+
+        inventory_file = web_dir / "remote_pcs.html"
+        if inventory_file.exists():
+            return HTMLResponse(content=inventory_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Inventory page not found</h1>", status_code=404)
+
+    @app.get("/compliance", response_class=HTMLResponse)
+    def compliance_page(session_token: str = Cookie(None)) -> HTMLResponse:
+        """Страница отчетов аудита и соответствия."""
+        if not session_token or not auth_manager.validate_session(session_token):
+            return RedirectResponse(url="/login")
+
+        compliance_file = web_dir / "compliance.html"
+        if compliance_file.exists():
+            return HTMLResponse(content=compliance_file.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Compliance page not found</h1>", status_code=404)
 
     # Настройка SSL
     ssl_config = {}

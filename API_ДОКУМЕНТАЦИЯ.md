@@ -171,7 +171,7 @@ curl http://localhost:8080/api/auth/me -b cookies.txt
 
 ## Эндпоинты работы с логами
 
-### GET /logs
+### GET /api/logs
 
 Получение логов с фильтрацией (требует аутентификации).
 
@@ -180,7 +180,7 @@ curl http://localhost:8080/api/auth/me -b cookies.txt
 - `severity` (optional, string): Фильтр по уровню важности (emerg, alert, crit, err, warn, notice, info, debug)
 - `since` (optional, string): Фильтр по времени (ISO формат, например "2024-01-01T00:00:00Z")
 - `search` (optional, string): Поиск по содержимому сообщения (LIKE поиск)
-- `limit` (optional, int): Максимальное количество событий (по умолчанию 200, максимум 1000)
+- `limit` (optional, int): Максимальное количество событий (по умолчанию 200, максимум 10000)
 - `offset` (optional, int): Смещение для пагинации (по умолчанию 0)
 
 **Response:**
@@ -207,19 +207,19 @@ curl http://localhost:8080/api/auth/me -b cookies.txt
 **Examples:**
 ```bash
 # Получить последние 100 логов
-curl "http://localhost:8080/logs?limit=100" -b cookies.txt
+curl "http://localhost:8080/api/logs?limit=100" -b cookies.txt
 
 # Фильтр по хосту и уровню важности
-curl "http://localhost:8080/logs?host=server1&severity=err" -b cookies.txt
+curl "http://localhost:8080/api/logs?host=server1&severity=err" -b cookies.txt
 
 # Поиск по содержимому
-curl "http://localhost:8080/logs?search=error" -b cookies.txt
+curl "http://localhost:8080/api/logs?search=error" -b cookies.txt
 
 # События за последние 24 часа
-curl "http://localhost:8080/logs?since=2024-01-01T00:00:00Z" -b cookies.txt
+curl "http://localhost:8080/api/logs?since=2024-01-01T00:00:00Z" -b cookies.txt
 
 # Пагинация
-curl "http://localhost:8080/logs?limit=50&offset=50" -b cookies.txt
+curl "http://localhost:8080/api/logs?limit=50&offset=50" -b cookies.txt
 ```
 
 ---
@@ -248,6 +248,34 @@ curl "http://localhost:8080/logs?limit=50&offset=50" -b cookies.txt
 **Example:**
 ```bash
 curl http://localhost:8080/stats -b cookies.txt
+```
+
+---
+
+### GET /api/agents/stats
+
+Получение статистики по агентам (онлайн/оффлайн) с учетом окна активности (требует аутентификации).
+
+**Query Parameters:**
+- `window_minutes` (optional, int): Окно активности в минутах (по умолчанию 5)
+
+**Response:**
+```json
+{
+    "total": 45,
+    "online": 42,
+    "offline": 3,
+    "window_minutes": 5,
+    "last_seen": {
+        "REMOTE-PC-001": "2024-01-01T12:00:00Z",
+        "REMOTE-PC-002": "2024-01-01T11:58:30Z"
+    }
+}
+```
+
+**Example:**
+```bash
+curl "http://localhost:8080/api/agents/stats?window_minutes=5" -b cookies.txt
 ```
 
 ---
@@ -363,7 +391,7 @@ csrf_token = data["csrf_token"]
 headers = {"X-CSRF-Token": csrf_token}
 cookies = {"session_token": session_token}
 response = requests.get(
-    f"{BASE_URL}/logs",
+    f"{BASE_URL}/api/logs",
     params={"limit": 100, "severity": "err"},
     headers=headers,
     cookies=cookies
@@ -403,7 +431,7 @@ const csrfToken = loginData.csrf_token;
 
 // Получение логов
 const logsResponse = await fetch(
-    `${BASE_URL}/logs?limit=100&severity=err`,
+    `${BASE_URL}/api/logs?limit=100&severity=err`,
     {
         headers: {"X-CSRF-Token": csrfToken},
         credentials: "include"
@@ -445,6 +473,7 @@ const logs = await logsResponse.json();
 - `incident_type` (optional, string): Фильтр по типу инцидента (brute_force, unauthorized_access, suspicious_activity, log_tampering, privilege_escalation, anomaly, malware_indicator)
 - `severity` (optional, string): Фильтр по критичности (critical, high, medium, low, info)
 - `status` (optional, string): Фильтр по статусу (open, closed, investigating)
+- `search` (optional, string): Поиск по описанию, хосту, типу и идентификатору правила
 - `since` (optional, string): Фильтр по времени обнаружения (ISO формат)
 - `limit` (optional, int): Максимальное количество инцидентов (по умолчанию 100, максимум 1000)
 - `offset` (optional, int): Смещение для пагинации (по умолчанию 0)
@@ -545,6 +574,6 @@ curl http://localhost:8080/api/incidents/stats -b cookies.txt
 
 ---
 
-**Версия документа**: 1.1  
-**Дата**: 2024
+**Версия документа**: 1.2  
+**Дата**: 2026-01-31
 

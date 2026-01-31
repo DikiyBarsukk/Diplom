@@ -15,11 +15,24 @@
 """
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
+
+
+def parse_event_time(value: str | None) -> Optional[datetime]:
+    """Безопасно парсит ISO-время события."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
 
 
 class IncidentType:
@@ -127,8 +140,10 @@ class BruteForceRule(IncidentRule):
             # Проверяем временное окно
             for i in range(len(host_events) - self.threshold + 1):
                 window_events = host_events[i:i + self.threshold]
-                first_time = datetime.fromisoformat(window_events[0].get("ts", "").replace("Z", "+00:00"))
-                last_time = datetime.fromisoformat(window_events[-1].get("ts", "").replace("Z", "+00:00"))
+                first_time = parse_event_time(window_events[0].get("ts"))
+                last_time = parse_event_time(window_events[-1].get("ts"))
+                if not first_time or not last_time:
+                    continue
                 
                 if last_time - first_time <= self.time_window:
                     # Найден инцидент
@@ -185,17 +200,13 @@ class UnauthorizedAccessRule(IncidentRule):
                  "успешный вход" in message) and
                 ("admin" in message or (event.get("unit") or "").lower() == "admin")):
                 
-                try:
-                    ts = event.get("ts", "")
-                    if ts:
-                        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                        hour = dt.hour
-                        
-                        if self.night_start <= hour < self.night_end:
-                            admin_logins.append(event)
-                except Exception as e:
-                    logger.warning(f"Error parsing timestamp: {e}")
+                ts = event.get("ts", "")
+                dt = parse_event_time(ts)
+                if not dt:
                     continue
+                hour = dt.hour
+                if self.night_start <= hour < self.night_end:
+                    admin_logins.append(event)
         
         if admin_logins:
             return {
@@ -265,10 +276,14 @@ class SuspiciousActivityRule(IncidentRule):
         suspicious_pairs = []
         
         for ps_event in powershell_events:
-            ps_time = datetime.fromisoformat(ps_event.get("ts", "").replace("Z", "+00:00"))
+            ps_time = parse_event_time(ps_event.get("ts"))
+            if not ps_time:
+                continue
             
             for dl_event in download_events:
-                dl_time = datetime.fromisoformat(dl_event.get("ts", "").replace("Z", "+00:00"))
+                dl_time = parse_event_time(dl_event.get("ts"))
+                if not dl_time:
+                    continue
                 time_diff = abs(ps_time - dl_time)
                 
                 if time_diff <= correlation_window:
@@ -400,7 +415,7 @@ class PrivilegeEscalationRule(IncidentRule):
             
             # Windows Event ID 4672 = вход с повышенными правами
             if (event_id == 4672 or 
-                "privilege" in message and "login" in message or
+                ("privilege" in message and "login" in message) or
                 "повышенные права" in message):
                 privileged_logins.append(event)
         
@@ -408,14 +423,20 @@ class PrivilegeEscalationRule(IncidentRule):
         if len(failed_logins) >= 2 and successful_logins and privileged_logins:
             # Ищем последовательность
             for failed in failed_logins[:2]:  # Берем первые 2 неудачные попытки
-                failed_time = datetime.fromisoformat(failed.get("ts", "").replace("Z", "+00:00"))
+                failed_time = parse_event_time(failed.get("ts"))
+                if not failed_time:
+                    continue
                 
                 for success in successful_logins:
-                    success_time = datetime.fromisoformat(success.get("ts", "").replace("Z", "+00:00"))
+                    success_time = parse_event_time(success.get("ts"))
+                    if not success_time:
+                        continue
                     
                     if success_time > failed_time and (success_time - failed_time) <= self.correlation_window:
                         for priv in privileged_logins:
-                            priv_time = datetime.fromisoformat(priv.get("ts", "").replace("Z", "+00:00"))
+                            priv_time = parse_event_time(priv.get("ts"))
+                            if not priv_time:
+                                continue
                             
                             if priv_time > success_time and (priv_time - success_time) <= self.correlation_window:
                                 return {

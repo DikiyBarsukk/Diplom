@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html class="dark" lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Управление удаленными ПК | BARSUKSIEM</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13a4ec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101c22",
+                        "surface-dark": "#1a2a32",
+                        "border-dark": "#233c48",
+                    },
+                    fontFamily: { "display": ["Inter"] },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-border-dark bg-white dark:bg-background-dark px-6 py-3 sticky top-0 z-50">
+    <div class="flex items-center gap-8">
+        <div class="flex items-center gap-4 text-primary">
+            <div class="size-6">
+                <span class="material-symbols-outlined text-3xl">security</span>
+            </div>
+            <h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">BARSUKSIEM</h2>
+        </div>
+        <nav class="hidden md:flex items-center gap-6">
+            <a class="text-slate-600 dark:text-[#92b7c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="/">Аудит ИБ</a>
+            <a class="text-primary dark:text-white text-sm font-medium border-b-2 border-primary pb-1" href="/inventory">Удаленные ПК</a>
+            <a class="text-slate-600 dark:text-[#92b7c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="/logs">Журналы</a>
+            <a class="text-slate-600 dark:text-[#92b7c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="/analytics">Отчеты</a>
+            <a class="text-slate-600 dark:text-[#92b7c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Настройки</a>
+        </nav>
+    </div>
+    <div class="flex flex-1 justify-end gap-4 items-center">
+        <label class="flex flex-col min-w-40 h-10 max-w-64">
+            <div class="flex w-full flex-1 items-stretch rounded-lg h-full border border-slate-200 dark:border-border-dark bg-slate-50 dark:bg-surface-dark overflow-hidden">
+                <div class="text-slate-400 dark:text-[#92b7c9] flex items-center justify-center pl-3">
+                    <span class="material-symbols-outlined text-xl">search</span>
+                </div>
+                <input id="pcSearch" class="form-input flex w-full border-none bg-transparent focus:ring-0 text-sm placeholder:text-slate-400 dark:placeholder:text-[#92b7c9]" placeholder="Поиск IP или хоста..." value=""/>
+            </div>
+        </label>
+        <div class="flex gap-2">
+            <button class="flex items-center justify-center rounded-lg size-10 bg-slate-100 dark:bg-border-dark text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Уведомления">
+                <span class="material-symbols-outlined">notifications</span>
+            </button>
+        </div>
+        <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-[#92b7c9]">person</span>
+        </div>
+    </div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+    <aside class="w-64 hidden lg:flex flex-col border-r border-slate-200 dark:border-border-dark bg-white dark:bg-background-dark p-4 shrink-0 overflow-y-auto">
+        <div class="flex flex-col gap-6">
+            <div>
+                <h3 class="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wider mb-4 opacity-60">Состояние сервиса журналов</h3>
+                <div class="flex flex-col gap-3">
+                    <div class="bg-slate-50 dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-border-dark">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-slate-500 dark:text-[#92b7c9]">Движок приема</span>
+                            <span class="size-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                        </div>
+                        <div class="text-lg font-bold text-slate-800 dark:text-white">Активен</div>
+                        <div class="mt-2 w-full bg-slate-200 dark:bg-border-dark rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-primary h-full w-[65%]"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 uppercase font-medium">Буфер 65%</p>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-border-dark">
+                        <span class="text-xs text-slate-500 dark:text-[#92b7c9]">Пропускная способность</span>
+                        <div class="text-lg font-bold text-slate-800 dark:text-white">1.2k <span class="text-xs font-normal text-slate-400">EPS</span></div>
+                        <div class="h-8 flex items-end gap-1 mt-1">
+                            <div class="w-full bg-primary/40 h-2/3 rounded-t-sm"></div>
+                            <div class="w-full bg-primary/40 h-1/2 rounded-t-sm"></div>
+                            <div class="w-full bg-primary/40 h-4/5 rounded-t-sm"></div>
+                            <div class="w-full bg-primary/40 h-3/5 rounded-t-sm"></div>
+                            <div class="w-full bg-primary h-full rounded-t-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col gap-2">
+                <h3 class="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wider mb-2 opacity-60">Быстрые представления</h3>
+                <div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary">
+                    <span class="material-symbols-outlined text-xl">devices</span>
+                    <p class="text-sm font-medium">Все удаленные ПК</p>
+                </div>
+                <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 dark:text-[#92b7c9] hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">warning</span>
+                    <p class="text-sm font-medium">Оповещения</p>
+                </div>
+                <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 dark:text-[#92b7c9] hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">history</span>
+                    <p class="text-sm font-medium">История аудита</p>
+                </div>
+            </div>
+            <div class="mt-auto pt-6">
+                <button class="w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
+                    <span class="material-symbols-outlined text-lg">refresh</span>
+                    <span class="truncate">Перезапустить сервис</span>
+                </button>
+                <div class="flex items-center gap-3 mt-4 px-2 opacity-60">
+                    <span class="material-symbols-outlined text-lg">memory</span>
+                    <p class="text-xs font-medium">Log Engine v2.4.8</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <main class="flex-1 overflow-y-auto flex flex-col p-6 lg:p-10 max-w-7xl mx-auto w-full">
+        <nav class="flex items-center gap-2 mb-4">
+            <a class="text-slate-400 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/">Главная</a>
+            <span class="material-symbols-outlined text-slate-300 dark:text-border-dark text-sm">chevron_right</span>
+            <span class="text-slate-900 dark:text-white text-sm font-semibold">Удаленные ПК</span>
+        </nav>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div class="flex flex-col gap-1">
+                <h1 class="text-slate-900 dark:text-white text-3xl font-black leading-tight tracking-tight">Управление подключениями</h1>
+                <p class="text-slate-500 dark:text-[#92b7c9] text-base">Мониторинг агентов и сбор журналов с удаленных ПК.</p>
+            </div>
+            <button class="flex min-w-[140px] items-center justify-center gap-2 rounded-lg h-12 px-6 bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:scale-[1.02] transition-all">
+                <span class="material-symbols-outlined">add</span>
+                <span class="truncate">Добавить ПК</span>
+            </button>
+        </div>
+        <div class="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark p-4 mb-6 flex flex-wrap justify-between items-center gap-4 shadow-sm">
+            <div class="flex gap-2">
+                <button class="p-2.5 rounded-lg border border-slate-200 dark:border-border-dark text-slate-600 dark:text-white hover:bg-slate-50 dark:hover:bg-border-dark transition-colors" title="Обновить статус">
+                    <span class="material-symbols-outlined text-xl">sync</span>
+                </button>
+                <button class="p-2.5 rounded-lg border border-slate-200 dark:border-border-dark text-slate-600 dark:text-white hover:bg-slate-50 dark:hover:bg-border-dark transition-colors" title="Проверить подключения">
+                    <span class="material-symbols-outlined text-xl">router</span>
+                </button>
+                <div class="h-10 w-px bg-slate-200 dark:bg-border-dark mx-2"></div>
+                <div class="flex items-center gap-2 px-3 bg-slate-100 dark:bg-background-dark/50 rounded-lg border border-slate-200 dark:border-border-dark">
+                    <span class="text-xs font-bold uppercase text-slate-400 dark:text-[#92b7c9]">Фильтр:</span>
+                    <select class="bg-transparent border-none text-xs font-semibold py-0 focus:ring-0 text-slate-700 dark:text-white">
+                        <option>Все ОС</option>
+                        <option>Windows</option>
+                        <option>Linux</option>
+                    </select>
+                </div>
+            </div>
+            <button class="flex items-center gap-2 rounded-lg h-10 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md">
+                <span class="material-symbols-outlined text-lg">barcode_scanner</span>
+                <span class="truncate">Сканировать логи</span>
+            </button>
+        </div>
+        <div class="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-background-dark/30 border-b border-slate-200 dark:border-border-dark">
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9]">
+                                <input class="rounded border-slate-300 dark:border-border-dark bg-transparent text-primary focus:ring-primary" type="checkbox"/>
+                            </th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9]">Имя хоста</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9]">IP-адрес</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9]">ОС</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9]">Статус агента</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9]">Последний аудит</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#92b7c9] text-right">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-border-dark" id="inventoryTableBody">
+                        <tr><td colspan="7" class="px-6 py-6 text-slate-500">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 flex items-center justify-between border-t border-slate-100 dark:border-border-dark">
+                <p class="text-xs text-slate-500 dark:text-[#92b7c9]" id="inventoryFooter">Показано 0 из 0</p>
+                <div class="flex gap-2">
+                    <button class="px-3 py-1 rounded-md border border-slate-200 dark:border-border-dark text-xs font-bold text-slate-600 dark:text-white hover:bg-slate-50 dark:hover:bg-border-dark disabled:opacity-50" disabled>Назад</button>
+                    <button class="px-3 py-1 rounded-md border border-slate-200 dark:border-border-dark text-xs font-bold text-slate-600 dark:text-white hover:bg-slate-50 dark:hover:bg-border-dark">Вперед</button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gradient-to-br from-primary to-blue-600 p-6 rounded-2xl text-white shadow-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="material-symbols-outlined text-3xl opacity-80">dns</span>
+                    <span class="text-[10px] font-black uppercase tracking-widest bg-white/20 px-2 py-1 rounded">Всего устройств</span>
+                </div>
+                <div class="text-4xl font-black mb-1" id="totalDevices">0</div>
+                <div class="text-sm opacity-80 font-medium">+0 за неделю</div>
+            </div>
+            <div class="bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark p-6 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="material-symbols-outlined text-3xl text-emerald-500">check_circle</span>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-[#92b7c9] px-2 py-1">Онлайн агенты</span>
+                </div>
+                <div class="text-4xl font-black text-slate-900 dark:text-white mb-1" id="onlineCount">0</div>
+                <div class="text-sm text-emerald-500 font-bold" id="onlinePercent">0% подключений</div>
+            </div>
+            <div class="bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark p-6 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="material-symbols-outlined text-3xl text-primary">analytics</span>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-[#92b7c9] px-2 py-1">Собрано логов</span>
+                </div>
+                <div class="text-4xl font-black text-slate-900 dark:text-white mb-1" id="logsCollected">0</div>
+                <div class="text-sm text-slate-500 dark:text-[#92b7c9] font-medium">За последние 24 часа</div>
+            </div>
+        </div>
+    </main>
+</div>
+<div class="fixed bottom-8 right-8">
+    <button class="size-14 bg-white dark:bg-surface-dark text-primary border border-slate-200 dark:border-border-dark rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform">
+        <span class="material-symbols-outlined">question_mark</span>
+    </button>
+</div>
+<script src="/static/remote-pcs.js"></script>
+</body>
+</html>

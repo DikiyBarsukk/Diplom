@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html class="dark" lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Отчеты и соответствие | BARSUKSIEM</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13a4ec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101c22",
+                        "card-dark": "#1a2a32",
+                        "border-dark": "#233c48",
+                        "text-muted": "#92b7c9",
+                    },
+                    fontFamily: { "display": ["Inter"] },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .widget-ghost {
+            background-image: radial-gradient(#233c48 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-border-dark bg-background-dark px-10 py-3 sticky top-0 z-50">
+    <div class="flex items-center gap-8">
+        <div class="flex items-center gap-3 text-white">
+            <div class="size-8 bg-primary rounded-lg flex items-center justify-center">
+                <span class="material-symbols-outlined text-white">policy</span>
+            </div>
+            <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">BARSUKSIEM</h2>
+        </div>
+        <nav class="flex items-center gap-6">
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/">Дашборд</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/inventory">Удаленные ПК</a>
+            <a class="text-white text-sm font-bold border-b-2 border-primary pb-1" href="/compliance">Отчеты аудита</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/logs">Журналы</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="#">Настройки</a>
+        </nav>
+    </div>
+    <div class="flex flex-1 justify-end gap-4 items-center">
+        <label class="flex flex-col min-w-40 h-9 max-w-64">
+            <div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+                <div class="text-text-muted flex border-none bg-border-dark items-center justify-center pl-3 rounded-l-lg">
+                    <span class="material-symbols-outlined text-[20px]">search</span>
+                </div>
+                <input id="complianceSearch" class="form-input flex w-full min-w-0 flex-1 border-none bg-border-dark text-white focus:ring-0 h-full placeholder:text-text-muted px-3 rounded-r-lg text-sm" placeholder="Поиск по отчетам..." value=""/>
+            </div>
+        </label>
+        <div class="flex gap-2">
+            <button id="generateComplianceBtn" class="flex items-center justify-center rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold hover:bg-opacity-90 transition-all">
+                <span>Сформировать сейчас</span>
+            </button>
+            <button id="exportComplianceBtn" class="flex items-center justify-center rounded-lg h-9 px-4 bg-border-dark text-white text-sm font-bold hover:bg-slate-700 transition-all">
+                <span>Экспорт журналов</span>
+            </button>
+        </div>
+        <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-9 border border-border-dark flex items-center justify-center">
+            <span class="material-symbols-outlined text-text-muted">person</span>
+        </div>
+    </div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+    <aside class="w-72 border-r border-border-dark flex flex-col bg-background-dark overflow-y-auto">
+        <div class="p-6">
+            <h1 class="text-white text-sm font-bold uppercase tracking-wider mb-1">Шаблоны соответствия</h1>
+            <p class="text-text-muted text-xs mb-6">Стандарты и отчеты аудита</p>
+            <div class="space-y-1">
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/20 text-primary border border-primary/30 text-left">
+                    <span class="material-symbols-outlined text-[20px] fill-current">person_search</span>
+                    <span class="text-sm font-bold">Отчет по активности пользователей</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">health_and_safety</span>
+                    <span class="text-sm font-medium">Аудит состояния системы</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">logout</span>
+                    <span class="text-sm font-medium">Сводка ошибок входа</span>
+                </button>
+                <div class="h-px bg-border-dark my-4"></div>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">verified_user</span>
+                    <span class="text-sm font-medium">PCI DSS 4.0</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">medical_services</span>
+                    <span class="text-sm font-medium">HIPAA Compliance</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-border-dark hover:text-white transition-all text-left">
+                    <span class="material-symbols-outlined text-[20px]">history</span>
+                    <span class="text-sm font-medium">Пользовательская история</span>
+                </button>
+            </div>
+            <div class="mt-10">
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 px-3">Инструменты аудита</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary transition-colors p-2 text-center">
+                        <span class="material-symbols-outlined text-text-muted">list_alt</span>
+                        <span class="text-[10px] text-text-muted font-medium">Журнал изменений</span>
+                    </div>
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary transition-colors p-2 text-center">
+                        <span class="material-symbols-outlined text-text-muted">folder_shared</span>
+                        <span class="text-[10px] text-text-muted font-medium">Доступ к файлам</span>
+                    </div>
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary transition-colors p-2 text-center">
+                        <span class="material-symbols-outlined text-text-muted">dns</span>
+                        <span class="text-[10px] text-text-muted font-medium">Карта процессов</span>
+                    </div>
+                    <div class="aspect-square bg-card-dark border border-border-dark rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary transition-colors p-2 text-center">
+                        <span class="material-symbols-outlined text-text-muted">account_tree</span>
+                        <span class="text-[10px] text-text-muted font-medium">AD аудит</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <main class="flex-1 flex flex-col overflow-y-auto widget-ghost">
+        <div class="flex items-center gap-2 px-8 py-4 bg-background-dark/50 backdrop-blur-sm border-b border-border-dark">
+            <a class="text-text-muted text-xs font-medium hover:text-white" href="#">Соответствие</a>
+            <span class="text-text-muted text-xs font-medium">/</span>
+            <span class="text-white text-xs font-bold">Отчет по активности пользователей</span>
+            <span class="ml-auto flex items-center gap-2 text-[10px] text-text-muted">
+                <span class="size-2 bg-emerald-500 rounded-full"></span>
+                Системы онлайн:
+                <span id="systemsOnline">0</span>/<span id="systemsTotal">0</span>
+            </span>
+        </div>
+        <div class="px-8 py-6 bg-card-dark/40 border-b border-border-dark">
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-white text-sm font-bold flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary text-[20px]">desktop_windows</span>
+                        Целевые активы
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <button id="selectAllAssetsBtn" class="text-[11px] font-bold text-primary hover:underline">Выбрать все</button>
+                        <span class="text-text-muted text-xs">|</span>
+                        <button id="resetAssetsBtn" class="text-[11px] font-bold text-text-muted hover:underline">Сбросить</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[10px] font-bold text-text-muted uppercase">Тип выбора</label>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2 px-3 bg-primary text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined text-[16px]">groups</span> Группа
+                            </button>
+                            <button class="flex-1 py-2 px-3 bg-border-dark text-text-muted text-xs font-bold rounded-lg hover:text-white flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined text-[16px]">computer</span> Отдельно
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2 md:col-span-2">
+                        <label class="text-[10px] font-bold text-text-muted uppercase">Выберите удаленный ПК или группу</label>
+                        <div class="relative">
+                            <select id="assetSelect" class="w-full bg-border-dark border-none rounded-lg text-sm text-white focus:ring-primary appearance-none px-4 py-2">
+                                <option value="all">Все удаленные ПК</option>
+                            </select>
+                            <span class="material-symbols-outlined absolute right-3 top-2.5 text-text-muted pointer-events-none">expand_more</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-wrap justify-between items-center gap-3 px-8 py-8">
+            <div class="flex flex-col gap-1">
+                <p class="text-white text-3xl font-black leading-tight tracking-tight">Аудит активности пользователей</p>
+                <p class="text-text-muted text-sm font-normal">Анализ системных журналов по сессиям, файлам и привилегиям</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="periodButton" class="flex items-center gap-2 rounded-lg h-10 px-5 bg-border-dark text-white text-sm font-bold hover:bg-slate-700 transition-all border border-border-dark">
+                    <span class="material-symbols-outlined text-[20px]">calendar_today</span>
+                    <span>Последние 30 дней</span>
+                </button>
+                <button id="analyzeLogsBtn" class="flex items-center gap-2 rounded-lg h-10 px-5 bg-primary text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(19,164,236,0.3)] transition-all">
+                    <span class="material-symbols-outlined text-[20px]">refresh</span>
+                    <span>Анализ журналов</span>
+                </button>
+            </div>
+        </div>
+        <div class="p-8 space-y-6 pt-0">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-card-dark border border-border-dark rounded-xl p-4">
+                    <p class="text-[10px] font-bold text-text-muted uppercase mb-1">Активные сессии</p>
+                    <p class="text-2xl font-black text-white" id="activeSessions">0</p>
+                </div>
+                <div class="bg-card-dark border border-border-dark rounded-xl p-4">
+                    <p class="text-[10px] font-bold text-text-muted uppercase mb-1">Нарушения политик</p>
+                    <p class="text-2xl font-black text-red-400" id="policyViolations">0</p>
+                </div>
+                <div class="bg-card-dark border border-border-dark rounded-xl p-4">
+                    <p class="text-[10px] font-bold text-text-muted uppercase mb-1">Повышение привилегий</p>
+                    <p class="text-2xl font-black text-orange-400" id="privEscalations">0</p>
+                </div>
+                <div class="bg-card-dark border border-border-dark rounded-xl p-4">
+                    <p class="text-[10px] font-bold text-text-muted uppercase mb-1">Оценка аудита</p>
+                    <p class="text-2xl font-black text-emerald-400" id="auditScore">0/100</p>
+                </div>
+            </div>
+            <div class="bg-card-dark border border-border-dark rounded-xl p-4">
+                <p class="text-[10px] font-bold text-text-muted uppercase mb-2">Топ пользователей</p>
+                <div id="topUsersList" class="space-y-2 text-sm text-white">
+                    <p class="text-text-muted text-sm">Нет данных для отображения.</p>
+                </div>
+            </div>
+            <div class="bg-card-dark border border-border-dark rounded-xl overflow-hidden">
+                <div class="p-6 border-b border-border-dark flex justify-between items-center">
+                    <h3 class="text-white font-bold text-lg">Журнал соответствия</h3>
+                    <div class="flex gap-2">
+                        <button class="text-text-muted hover:text-white px-3 py-1 text-xs font-bold border border-border-dark rounded">Все логи</button>
+                        <button class="text-red-400 px-3 py-1 text-xs font-bold border border-red-900/30 bg-red-900/10 rounded">Нарушения</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-background-dark/50 text-text-muted font-bold uppercase text-[10px] tracking-widest">
+                            <tr>
+                                <th class="px-6 py-4">Пользователь / актив</th>
+                                <th class="px-6 py-4">Тип события</th>
+                                <th class="px-6 py-4">Удаленный ПК</th>
+                                <th class="px-6 py-4">Время (UTC)</th>
+                                <th class="px-6 py-4">Уровень риска</th>
+                                <th class="px-6 py-4 text-right">Улики</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border-dark" id="complianceTableBody">
+                            <tr><td colspan="6" class="px-6 py-6 text-text-muted text-sm">Загрузка данных...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    <aside class="w-72 border-l border-border-dark bg-background-dark overflow-y-auto">
+        <div class="p-6 space-y-8">
+            <div>
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">event_repeat</span>
+                    Частота аудита
+                </h3>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-border-dark hover:border-primary/50 cursor-pointer bg-card-dark transition-all">
+                        <input class="text-primary focus:ring-primary bg-background-dark border-border-dark" name="freq" type="radio"/>
+                        <span class="text-sm font-medium text-white">Ежедневно</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-primary bg-primary/10 cursor-pointer transition-all">
+                        <input checked class="text-primary focus:ring-primary bg-background-dark border-primary" name="freq" type="radio"/>
+                        <span class="text-sm font-bold text-white">Еженедельно</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-border-dark hover:border-primary/50 cursor-pointer bg-card-dark transition-all">
+                        <input class="text-primary focus:ring-primary bg-background-dark border-border-dark" name="freq" type="radio"/>
+                        <span class="text-sm font-medium text-white">Ежемесячно</span>
+                    </label>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">verified</span>
+                    Сертификация отчета
+                </h3>
+                <div class="space-y-3">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input checked class="rounded border-border-dark bg-card-dark text-primary focus:ring-primary" type="checkbox"/>
+                        <span class="text-xs text-text-muted">Цифровая подпись</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input class="rounded border-border-dark bg-card-dark text-primary focus:ring-primary" type="checkbox"/>
+                        <span class="text-xs text-text-muted">Включить сырые логи (JSON)</span>
+                    </label>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-4">
+                    <button class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary bg-primary/10 text-white text-xs font-bold">
+                        <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF
+                    </button>
+                    <button class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-border-dark bg-card-dark text-text-muted hover:text-white text-xs font-bold">
+                        <span class="material-symbols-outlined text-[16px]">table_chart</span> CSV
+                    </button>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span>
+                    Получатели
+                </h3>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between p-2 rounded bg-border-dark/50">
+                        <span class="text-[11px] text-white">compliance-officer@org</span>
+                        <span class="material-symbols-outlined text-[14px] text-text-muted cursor-pointer">close</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded bg-border-dark/50">
+                        <span class="text-[11px] text-white">external-auditor@firm.com</span>
+                        <span class="material-symbols-outlined text-[14px] text-text-muted cursor-pointer">close</span>
+                    </div>
+                </div>
+            </div>
+            <button class="w-full py-4 bg-primary text-white font-black text-sm rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">analytics</span>
+                ПРОВЕСТИ ПРОВЕРКУ
+            </button>
+        </div>
+    </aside>
+</div>
+<script src="/static/compliance.js"></script>
+</body>
+</html>

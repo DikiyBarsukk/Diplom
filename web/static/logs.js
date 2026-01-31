@@ -8,12 +8,14 @@ let totalEvents = 0;
 let currentSort = { field: 'ts', direction: 'desc' };
 let allEvents = [];
 let autoRefreshInterval = null;
+let initialFilters = null;
 let refreshInterval = 30000; // 30 seconds default
 
 // Initialize logs page
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     checkAuth();
+    initialFilters = getUrlFilters();
     loadStats();
     setupEventListeners();
     setupAutoRefresh();
@@ -33,7 +35,7 @@ async function checkAuth() {
         
         if (response.ok) {
             const user = await response.json();
-            document.getElementById('username').textContent = user.username || 'Администратор';
+            document.getElementById('username').textContent = user.username || 'Аудитор';
         }
     } catch (error) {
         console.error('Auth check failed:', error);
@@ -217,6 +219,7 @@ async function loadStats() {
                              (severityCounts.alert || 0) + 
                              (severityCounts.crit || 0);
         document.getElementById('alert-count').textContent = criticalCount;
+        applyInitialFilters();
     } catch (error) {
         console.error('Error loading stats:', error);
     }
@@ -234,6 +237,33 @@ function updateHostFilter(stats) {
         option.textContent = host;
         hostFilter.appendChild(option);
     });
+}
+
+function getUrlFilters() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        host: params.get('host') || '',
+        search: params.get('search') || '',
+        severity: params.get('severity') || '',
+        time: params.get('time') || '',
+        applied: false
+    };
+}
+
+function applyInitialFilters() {
+    if (!initialFilters || initialFilters.applied) return;
+    const searchInput = document.getElementById('searchInput');
+    const severityFilter = document.getElementById('severityFilter');
+    const timeFilter = document.getElementById('timeFilter');
+    const hostFilter = document.getElementById('hostFilter');
+
+    if (searchInput && initialFilters.search) searchInput.value = initialFilters.search;
+    if (severityFilter && initialFilters.severity) severityFilter.value = initialFilters.severity;
+    if (timeFilter && initialFilters.time) timeFilter.value = initialFilters.time;
+    if (hostFilter && initialFilters.host) hostFilter.value = initialFilters.host;
+
+    initialFilters.applied = true;
+    loadLogs();
 }
 
 async function loadLogs() {
@@ -391,13 +421,15 @@ function displayLogs(events) {
         };
         const severityLabel = severityTranslations[severity] || severity;
         
+        const shortMessage = (event.message || '').substring(0, 100);
+        const shortSuffix = (event.message || '').length > 100 ? '...' : '';
         row.innerHTML = `
-            <td>${formatDate(event.ts)}</td>
-            <td><span class="severity-badge ${severityClass}">${severityLabel}</span></td>
-            <td>${event.host || 'Н/Д'}</td>
-            <td>${event.unit || 'Н/Д'}</td>
-            <td>${event.pid || 'Н/Д'}</td>
-            <td>${(event.message || '').substring(0, 100)}${(event.message || '').length > 100 ? '...' : ''}</td>
+            <td>${escapeHtml(formatDate(event.ts))}</td>
+            <td><span class="severity-badge ${severityClass}">${escapeHtml(severityLabel)}</span></td>
+            <td>${escapeHtml(event.host || 'Н/Д')}</td>
+            <td>${escapeHtml(event.unit || 'Н/Д')}</td>
+            <td>${escapeHtml(String(event.pid ?? 'Н/Д'))}</td>
+            <td>${escapeHtml(shortMessage)}${shortSuffix}</td>
         `;
         
         tbody.appendChild(row);
@@ -432,48 +464,49 @@ function showEventDetails(eventIndex) {
         }
     };
     
+    const rawJson = event.raw ? escapeHtml(JSON.stringify(event.raw, null, 2)) : '';
     body.innerHTML = `
         <div class="event-detail-item">
             <div class="event-detail-label">Время</div>
-            <div class="event-detail-value">${formatDate(event.ts)}</div>
+            <div class="event-detail-value">${escapeHtml(formatDate(event.ts))}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">Уровень важности</div>
-            <div class="event-detail-value">${severityTranslations[event.severity] || event.severity}</div>
+            <div class="event-detail-value">${escapeHtml(severityTranslations[event.severity] || event.severity)}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">Хост</div>
-            <div class="event-detail-value">${event.host || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(event.host || 'Н/Д')}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">Источник</div>
-            <div class="event-detail-value">${event.source || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(event.source || 'Н/Д')}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">Служба</div>
-            <div class="event-detail-value">${event.unit || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(event.unit || 'Н/Д')}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">Процесс</div>
-            <div class="event-detail-value">${event.process || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(event.process || 'Н/Д')}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">PID</div>
-            <div class="event-detail-value">${event.pid || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(String(event.pid ?? 'Н/Д'))}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">UID</div>
-            <div class="event-detail-value">${event.uid || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(String(event.uid ?? 'Н/Д'))}</div>
         </div>
         <div class="event-detail-item">
             <div class="event-detail-label">Сообщение</div>
-            <div class="event-detail-value">${event.message || 'Н/Д'}</div>
+            <div class="event-detail-value">${escapeHtml(event.message || 'Н/Д')}</div>
         </div>
         ${event.raw ? `
         <div class="event-detail-item">
             <div class="event-detail-label">Исходные данные</div>
             <div class="event-detail-value">
-                <pre>${JSON.stringify(event.raw, null, 2)}</pre>
+                <pre>${rawJson}</pre>
             </div>
         </div>
         ` : ''}
@@ -499,6 +532,13 @@ function toggleTheme() {
     const isDark = document.body.classList.contains('dark-theme');
     document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
+}
+
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
 }
 
 function updateRefreshInterval() {

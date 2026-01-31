@@ -15,6 +15,7 @@ class Cache:
     
     def get(self, key: str) -> Optional[Any]:
         """Получает значение из кэша."""
+        self.cleanup()
         if key not in self._cache:
             return None
         
@@ -27,6 +28,7 @@ class Cache:
     
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """Сохраняет значение в кэш."""
+        self.cleanup()
         ttl = ttl or self.default_ttl
         self._cache[key] = {
             'value': value,
