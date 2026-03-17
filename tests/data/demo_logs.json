@@ -1,0 +1,39 @@
+[
+  {
+    "host": "demo-host",
+    "source": "eventlog",
+    "message": "login_failed for admin",
+    "ts": "2026-01-01T00:00:00Z"
+  },
+  {
+    "host": "demo-host",
+    "source": "eventlog",
+    "message": "login_failed for admin",
+    "ts": "2026-01-01T00:01:00Z"
+  },
+  {
+    "host": "demo-host",
+    "source": "eventlog",
+    "message": "login_failed for admin",
+    "ts": "2026-01-01T00:02:00Z"
+  },
+  {
+    "host": "demo-host",
+    "source": "eventlog",
+    "message": "login_failed for admin",
+    "ts": "2026-01-01T00:03:00Z"
+  },
+  {
+    "host": "demo-host",
+    "source": "eventlog",
+    "message": "login_failed for admin",
+    "ts": "2026-01-01T00:04:00Z"
+  },
+  {
+    "host": "demo-host",
+    "source": "eventlog",
+    "message": "powershell invoke-webrequest download payload",
+    "process": "powershell",
+    "ts": "2026-01-01T00:05:00Z"
+  }
+]

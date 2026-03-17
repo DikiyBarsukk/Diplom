@@ -1,4 +1,4 @@
-"""
+﻿"""
 Модуль анализа инцидентов информационной безопасности.
 
 Реализует:
@@ -16,6 +16,7 @@
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from server.time_utils import utc_now_iso
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
 
@@ -493,7 +494,7 @@ class IncidentAnalyzer:
                 incident = rule.check(events, context)
                 if incident:
                     # Добавляем метаданные
-                    incident["detected_at"] = datetime.utcnow().isoformat()
+                    incident["detected_at"] = utc_now_iso()
                     incident["analyzer_version"] = "0.4"
                     incidents.append(incident)
                     logger.info(f"Incident detected: {incident['title']} (Rule: {rule.rule_id})")
@@ -526,4 +527,6 @@ def get_analyzer() -> IncidentAnalyzer:
     if _analyzer is None:
         _analyzer = IncidentAnalyzer()
     return _analyzer
+
+
 

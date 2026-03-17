@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html class="dark" lang="ru">
 <head>
     <meta charset="utf-8"/>
@@ -56,7 +56,7 @@
         </div>
         <nav class="flex items-center gap-6">
             <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/">Дашборд</a>
-            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/incidents">События ИБ</a>
+            <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/incidents">РЎРѕР±С‹С‚РёСЏ РР‘</a>
             <a class="text-white text-sm font-bold border-b-2 border-primary pb-1" href="/analytics">Отчеты</a>
             <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="/logs">Журналы</a>
             <a class="text-text-muted hover:text-white text-sm font-medium transition-colors" href="#">Настройки</a>
@@ -192,9 +192,9 @@
                         <button class="p-1 hover:bg-border-dark rounded"><span class="material-symbols-outlined text-[18px] text-text-muted">settings</span></button>
                     </div>
                     <div class="flex flex-col">
-                        <p class="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">Индекс риска в реальном времени</p>
+                        <p class="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">РРЅРґРµРєСЃ СЂРёСЃРєР° РІ СЂРµР°Р»СЊРЅРѕРј РІСЂРµРјРµРЅРё</p>
                         <div class="flex items-baseline gap-3">
-                            <p class="text-white text-4xl font-black tracking-tight" id="riskLevel">ВЫСОКИЙ</p>
+                            <p class="text-white text-4xl font-black tracking-tight" id="riskLevel">Р’Р«РЎРћРљРР™</p>
                             <span class="text-red-400 text-sm font-bold flex items-center gap-0.5" id="riskHint">
                                 <span class="material-symbols-outlined text-[16px]">warning</span>
                                 Критическая зона
@@ -223,7 +223,7 @@
             </div>
             <div class="bg-card-dark border border-border-dark rounded-xl overflow-hidden group relative">
                 <div class="p-6 border-b border-border-dark flex justify-between items-center">
-                    <h3 class="text-white font-bold text-lg">Журнал событий ИБ (детали)</h3>
+                    <h3 class="text-white font-bold text-lg">Р–СѓСЂРЅР°Р» СЃРѕР±С‹С‚РёР№ РР‘ (РґРµС‚Р°Р»Рё)</h3>
                     <button class="text-primary text-sm font-bold flex items-center gap-1">
                         <span>Фильтр</span>
                         <span class="material-symbols-outlined text-[18px]">filter_alt</span>
@@ -236,7 +236,7 @@
                                 <th class="px-6 py-4">Статус</th>
                                 <th class="px-6 py-4">Время</th>
                                 <th class="px-6 py-4">Тип события</th>
-                                <th class="px-6 py-4">Источник</th>
+                                <th class="px-6 py-4">РСЃС‚РѕС‡РЅРёРє</th>
                                 <th class="px-6 py-4">Важность</th>
                                 <th class="px-6 py-4 text-right">Действие</th>
                             </tr>
@@ -328,11 +328,19 @@
             </div>
             <button id="generateReportBtn" class="w-full py-4 bg-primary text-white font-black text-sm rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                 <span class="material-symbols-outlined">rocket_launch</span>
-                СФОРМИРОВАТЬ ОТЧЕТ
+                РЎР¤РћР РњРР РћР’РђРўР¬ РћРўР§Р•Рў
             </button>
         </div>
     </aside>
 </div>
+<script src="/static/auth-client.js"></script>
+<script src="/static/app-shell.js"></script>
+<script src="/static/data-client.js"></script>
 <script src="/static/reports.js"></script>
 </body>
 </html>
+
+
+
+
+

@@ -38,7 +38,7 @@ async function checkAuth() {
             document.getElementById('username').textContent = user.username || 'Аудитор';
             
             // Обновляем счетчик критических событий
-            const statsResponse = await authenticatedFetch(`${API_BASE}/stats`);
+            const statsResponse = await authenticatedFetch(`${API_BASE}/api/stats`);
             const stats = await statsResponse.json();
             const severityCounts = stats.severity || {};
             const criticalCount = (severityCounts.emerg || 0) + 
@@ -142,7 +142,7 @@ function setupEventListeners() {
 async function loadAnalytics() {
     try {
         // Load stats
-        const statsResponse = await authenticatedFetch(`${API_BASE}/stats`);
+        const statsResponse = await authenticatedFetch(`${API_BASE}/api/stats`);
         const stats = await statsResponse.json();
         
         // Load events for charts
@@ -789,4 +789,5 @@ function exportChart(chartId, name) {
     link.download = `${name}_${new Date().toISOString().split('T')[0]}.png`;
     link.click();
 }
+
 

@@ -1,4 +1,8 @@
-const API_BASE = window.location.origin;
+﻿const API_BASE = window.location.origin;
+const { authenticatedFetch: authFetch, checkAuth: authCheck } = window.AuthClient;
+async function authenticatedFetch(url, options = {}) {
+    return authFetch(url, options);
+}
 let autoRefreshTimer = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -13,17 +17,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkAuth() {
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
-    if (res.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
-    }
+    return authCheck({ usernameElementId: 'username', fallbackUsername: 'Аудитор' });
 }
 
 async function loadInventory() {
     const [agentsRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/agents/stats?window_minutes=5`, { credentials: 'include' }).catch(() => null),
-        fetch(`${API_BASE}/stats`, { credentials: 'include' }).catch(() => null),
+        authenticatedFetch(`${API_BASE}/api/agents/stats?window_minutes=5`).catch(() => null),
+        authenticatedFetch(`${API_BASE}/api/stats`).catch(() => null),
     ]);
     const agents = agentsRes?.ok ? await agentsRes.json() : null;
     const stats = statsRes?.ok ? await statsRes.json() : {};
@@ -122,3 +122,7 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+
+
+

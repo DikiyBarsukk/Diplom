@@ -1,86 +1,47 @@
-"""
-Модуль для аутентификации и авторизации пользователей.
-Реализует продвинутые механизмы информационной безопасности.
+﻿"""
+Auth manager for BARSUKSIEM users, sessions and audit log.
 """
 import logging
 import secrets
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Iterator, Optional, Dict, Any, List, Tuple
-from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from server.security import (
-    PasswordSecurity, RateLimiter, CSRFProtection, 
-    InputSanitizer
-)
+from server.security import CSRFProtection, InputSanitizer, PasswordSecurity, RateLimiter
+from server.time_utils import utc_now, utc_now_iso
 
-# Настройка логирования
 logger = logging.getLogger(__name__)
 
 
 class AuthManager:
-    """
-    Управление аутентификацией и авторизацией пользователей.
-    
-    Реализует продвинутые механизмы безопасности:
-    - bcrypt для хеширования паролей (12 раундов)
-    - Защита от timing attacks через constant-time операции
-    - Rate limiting для защиты от brute force (5 попыток за 5 минут)
-    - Валидация и санитизация входных данных
-    - Управление сессиями с ротацией (одна активная сессия на пользователя)
-    - CSRF защита через токены
-    - Аудит всех действий пользователей
-    
-    Поддерживаемые роли:
-    - admin: полный доступ (read, write, delete, manage_users)
-    - auditor: только чтение (read)
-    - guest: только чтение (read)
-    
-    Example:
-        >>> auth = AuthManager(db_path="logs.db")
-        >>> user, error = auth.authenticate("admin", "Admin123!@#")
-        >>> if user:
-        ...     session = auth.create_session(user['id'], user['username'])
-        ...     print(session['session_token'])
-    """
-    
+    """Manage authentication, authorization and audit trail."""
+
     ROLES = {
-        'admin': ['read', 'write', 'delete', 'manage_users'],
-        'auditor': ['read'],
-        'guest': ['read']
+        "admin": ["read", "write", "delete", "manage_users"],
+        "auditor": ["read"],
+        "guest": ["read"],
     }
-    
-    def __init__(self, db_path: str = "logs.db"):
-        """
-        Инициализирует менеджер аутентификации.
-        
-        Args:
-            db_path (str): Путь к файлу базы данных SQLite.
-                По умолчанию "logs.db" в текущей директории.
-        
-        Note:
-            При первом запуске автоматически:
-            - Создаются таблицы users, sessions, audit_log
-            - Создается пользователь по умолчанию (admin/Admin123!@#)
-        """
+
+    def __init__(
+        self,
+        db_path: str = "logs.db",
+        bootstrap_admin_username: Optional[str] = None,
+        bootstrap_admin_password: Optional[str] = None,
+        demo_mode: bool = False,
+    ):
         self.db_path = db_path
         self.rate_limiter = RateLimiter()
+        self.bootstrap_admin_username = bootstrap_admin_username
+        self.bootstrap_admin_password = bootstrap_admin_password
+        self.demo_mode = demo_mode
         self._init_db()
-        self._create_default_user()
-    
+        self._bootstrap_admin_user()
+
     @contextmanager
     def _get_connection(self) -> Iterator[sqlite3.Connection]:
-        """
-        Context manager для получения соединения с БД.
-        Создает новое соединение для каждого запроса (безопасно для многопоточности).
-        """
-        conn = sqlite3.connect(
-            self.db_path,
-            check_same_thread=False  # Разрешаем использование из разных потоков
-        )
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        
         try:
             yield conn
             conn.commit()
@@ -89,14 +50,12 @@ class AuthManager:
             raise
         finally:
             conn.close()
-    
+
     def _init_db(self) -> None:
-        """Инициализирует таблицы для пользователей и сессий."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            
-            # Таблица пользователей
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
@@ -108,10 +67,10 @@ class AuthManager:
                     locked_until TEXT,
                     password_changed_at TEXT
                 )
-            """)
-            
-            # Таблица сессий
-            cursor.execute("""
+                """
+            )
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
@@ -124,10 +83,10 @@ class AuthManager:
                     user_agent TEXT,
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
-            """)
-            
-            # Таблица аудита действий
-            cursor.execute("""
+                """
+            )
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -139,395 +98,292 @@ class AuthManager:
                     timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
-            """)
-            
-            # Индексы
+                """
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)")
-            
-            conn.commit()
-    
-    def _create_default_user(self) -> None:
-        """Создает пользователя по умолчанию, если его нет."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            # Создаем админа: admin/Admin123!@#
-            # Используем безопасный пароль для демонстрации
-            password_hash = PasswordSecurity.hash_password("Admin123!@#")
-            cursor.execute("""
+
+    def _generate_bootstrap_password(self) -> str:
+        return f"Adm1n!{secrets.token_urlsafe(9)}"
+
+    def _bootstrap_admin_user(self) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users")
+            if cursor.fetchone()[0] != 0:
+                return
+
+            username = self.bootstrap_admin_username or "admin"
+            password = self.bootstrap_admin_password or self._generate_bootstrap_password()
+            generated_password = self.bootstrap_admin_password is None
+            password_hash = PasswordSecurity.hash_password(password)
+            now = utc_now_iso()
+            cursor.execute(
+                """
                 INSERT INTO users (username, password_hash, role, password_changed_at)
                 VALUES (?, ?, ?, ?)
-            """, ("admin", password_hash, "admin", datetime.utcnow().isoformat()))
-            conn.commit()
-        
-        conn.close()
-    
+                """,
+                (username, password_hash, "admin", now),
+            )
+
+            if generated_password:
+                logger.warning(
+                    "Bootstrap admin created. Username: %s Password: %s. Set BARSUKSIEM_BOOTSTRAP_ADMIN_PASSWORD to control it explicitly.",
+                    username,
+                    password,
+                )
+            else:
+                logger.warning(
+                    "Bootstrap admin created from configuration for user %s%s",
+                    username,
+                    " (demo mode)" if self.demo_mode else "",
+                )
+
     def _hash_password(self, password: str) -> str:
-        """
-        Хеширует пароль с использованием bcrypt.
-        
-        Args:
-            password: Пароль для хеширования
-            
-        Returns:
-            Хешированный пароль
-        """
         return PasswordSecurity.hash_password(password)
-    
-    def authenticate(self, username: str, password: str, 
-                    ip_address: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-        """
-        Аутентифицирует пользователя с защитой от brute force атак.
-        
-        Args:
-            username: Имя пользователя
-            password: Пароль
-            ip_address: IP адрес клиента (для rate limiting)
-            
-        Returns:
-            (user_dict, error_message)
-        """
-        # Валидация и санитизация входных данных
+
+    def authenticate(
+        self,
+        username: str,
+        password: str,
+        ip_address: Optional[str] = None,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         is_valid_username, username_error = InputSanitizer.validate_username(username)
         if not is_valid_username:
-            return None, username_error or "Недопустимое имя пользователя"
-        
+            return None, username_error or "Invalid username"
+
         username = InputSanitizer.sanitize_string(username, max_length=50)
-        
-        # Rate limiting по IP и username
         rate_limit_key = f"{ip_address or 'unknown'}:{username}"
         is_allowed, retry_after = self.rate_limiter.check_rate_limit(
-            rate_limit_key, max_attempts=5, window_seconds=300
+            rate_limit_key,
+            max_attempts=5,
+            window_seconds=300,
         )
-        
         if not is_allowed:
             self.rate_limiter.record_attempt(rate_limit_key, False)
-            return None, f"Слишком много неудачных попыток. Попробуйте через {retry_after} секунд"
-        
-        with sqlite3.connect(self.db_path) as conn:
+            return None, f"Too many failed login attempts. Retry after {retry_after} seconds"
+
+        with self._get_connection() as conn:
             cursor = conn.cursor()
-            
-            # Проверяем блокировку аккаунта
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, username, role, password_hash, locked_until, failed_login_attempts
                 FROM users WHERE username = ?
-            """, (username,))
-            
+                """,
+                (username,),
+            )
             user_row = cursor.fetchone()
-            
+
             if not user_row:
-                # Пользователь не найден - все равно проверяем пароль для защиты от timing attacks
-                # Используем фиктивный хеш для постоянного времени выполнения
                 dummy_hash = PasswordSecurity.hash_password("dummy")
                 PasswordSecurity.verify_password(password, dummy_hash)
                 self.rate_limiter.record_attempt(rate_limit_key, False)
-                return None, "Неверное имя пользователя или пароль"
-            
+                return None, "Invalid username or password"
+
             user_id, db_username, role, password_hash, locked_until, failed_attempts = user_row
-            
-            # Проверяем блокировку аккаунта
+            now = utc_now()
             if locked_until:
                 try:
                     lock_time = datetime.fromisoformat(locked_until)
                 except Exception:
                     lock_time = None
-                if lock_time and lock_time > datetime.utcnow():
-                    remaining_seconds = int((lock_time - datetime.utcnow()).total_seconds())
-                    return None, f"Аккаунт заблокирован. Попробуйте через {remaining_seconds} секунд"
-            
-            # Проверяем пароль с защитой от timing attacks
+                if lock_time and lock_time > now:
+                    remaining_seconds = int((lock_time - now).total_seconds())
+                    return None, f"Account is locked. Retry after {remaining_seconds} seconds"
+
             is_valid = PasswordSecurity.verify_password(password, password_hash)
-            
             if is_valid:
-                # Успешная аутентификация
-                now = datetime.utcnow().isoformat()
-                cursor.execute("""
-                    UPDATE users 
+                cursor.execute(
+                    """
+                    UPDATE users
                     SET last_login = ?, failed_login_attempts = 0, locked_until = NULL
                     WHERE id = ?
-                """, (now, user_id))
-                conn.commit()
-                
+                    """,
+                    (now.isoformat(), user_id),
+                )
                 self.rate_limiter.record_attempt(rate_limit_key, True)
-                
-                return {
-                    "id": user_id,
-                    "username": db_username,
-                    "role": role
-                }, None
-            
-            # Неудачная аутентификация
+                return {"id": user_id, "username": db_username, "role": role}, None
+
             failed_attempts += 1
-            locked_until = None
-            
-            # Блокируем аккаунт после 5 неудачных попыток на 30 минут
+            new_locked_until = None
             if failed_attempts >= 5:
-                locked_until = (datetime.utcnow() + timedelta(minutes=30)).isoformat()
-            
-            cursor.execute("""
-                UPDATE users 
+                new_locked_until = (now + timedelta(minutes=30)).isoformat()
+            cursor.execute(
+                """
+                UPDATE users
                 SET failed_login_attempts = ?, locked_until = ?
                 WHERE id = ?
-            """, (failed_attempts, locked_until, user_id))
-            conn.commit()
-            
+                """,
+                (failed_attempts, new_locked_until, user_id),
+            )
             self.rate_limiter.record_attempt(rate_limit_key, False)
-            
-            if locked_until:
-                return None, "Аккаунт заблокирован из-за множественных неудачных попыток входа"
-            return None, "Неверное имя пользователя или пароль"
-    
-    def create_session(self, user_id: int, username: str, 
-                      ip_address: Optional[str] = None,
-                      user_agent: Optional[str] = None) -> Dict[str, str]:
-        """
-        Создает сессию для пользователя с CSRF токеном.
-        
-        Args:
-            user_id: ID пользователя
-            username: Имя пользователя
-            ip_address: IP адрес клиента
-            user_agent: User-Agent заголовок
-            
-        Returns:
-            Словарь с session_token и csrf_token
-        """
-        # Генерируем токены
+
+            if new_locked_until:
+                return None, "Account is locked after repeated failed attempts"
+            return None, "Invalid username or password"
+
+    def create_session(
+        self,
+        user_id: int,
+        username: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Dict[str, str]:
         session_token = secrets.token_urlsafe(32)
         csrf_token = CSRFProtection.generate_token()
-        expires_at = datetime.utcnow() + timedelta(hours=24)
-        now = datetime.utcnow().isoformat()
-        
-        with sqlite3.connect(self.db_path) as conn:
+        expires_at = utc_now() + timedelta(hours=24)
+        now = utc_now_iso()
+
+        with self._get_connection() as conn:
             cursor = conn.cursor()
-            
-            # Инвалидируем старые сессии пользователя (ротация сессий)
             cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-            
-            cursor.execute("""
-                INSERT INTO sessions (user_id, token, csrf_token, expires_at, 
-                                    ip_address, user_agent, last_activity)
+            cursor.execute(
+                """
+                INSERT INTO sessions (user_id, token, csrf_token, expires_at, ip_address, user_agent, last_activity)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, session_token, csrf_token, expires_at.isoformat(),
-                  ip_address, user_agent, now))
-            
-            conn.commit()
-        
-        return {
-            "session_token": session_token,
-            "csrf_token": csrf_token
-        }
-    
+                """,
+                (user_id, session_token, csrf_token, expires_at.isoformat(), ip_address, user_agent, now),
+            )
+
+        return {"session_token": session_token, "csrf_token": csrf_token}
+
     def validate_session(self, token: str, update_activity: bool = True) -> Optional[Dict[str, Any]]:
-        """
-        Проверяет валидность сессии и обновляет время активности.
-        
-        Args:
-            token: Токен сессии
-            update_activity: Обновлять ли время последней активности
-            
-        Returns:
-            Информация о пользователе или None
-        """
-        with sqlite3.connect(self.db_path) as conn:
+        now = utc_now()
+        now_iso = now.isoformat()
+        with self._get_connection() as conn:
             cursor = conn.cursor()
-            
-            # Удаляем истекшие сессии
-            cursor.execute("DELETE FROM sessions WHERE expires_at < ?", 
-                          (datetime.utcnow().isoformat(),))
-            
-            cursor.execute("""
+            cursor.execute("DELETE FROM sessions WHERE expires_at < ?", (now_iso,))
+            cursor.execute(
+                """
                 SELECT s.user_id, u.username, u.role, s.csrf_token, s.last_activity
                 FROM sessions s
                 JOIN users u ON s.user_id = u.id
                 WHERE s.token = ? AND s.expires_at > ?
-            """, (token, datetime.utcnow().isoformat()))
-            
+                """,
+                (token, now_iso),
+            )
             result = cursor.fetchone()
-            
-            if result:
-                user_id, username, role, csrf_token, last_activity = result
-                
-                # Обновляем время активности (не чаще раза в минуту)
-                if update_activity:
-                    try:
-                        last_activity_time = datetime.fromisoformat(last_activity)
-                        if (datetime.utcnow() - last_activity_time).total_seconds() > 60:
-                            cursor.execute("""
-                                UPDATE sessions SET last_activity = ? WHERE token = ?
-                            """, (datetime.utcnow().isoformat(), token))
-                    except Exception:
-                        pass
-                
-                conn.commit()
-                
-                return {
-                    "id": user_id,
-                    "username": username,
-                    "role": role,
-                    "csrf_token": csrf_token
-                }
-            
-            conn.commit()
-            return None
-    
+            if not result:
+                return None
+
+            user_id, username, role, csrf_token, last_activity = result
+            if update_activity:
+                try:
+                    last_activity_time = datetime.fromisoformat(last_activity)
+                    if (now - last_activity_time).total_seconds() > 60:
+                        cursor.execute(
+                            "UPDATE sessions SET last_activity = ? WHERE token = ?",
+                            (now_iso, token),
+                        )
+                except Exception:
+                    pass
+            return {
+                "id": user_id,
+                "username": username,
+                "role": role,
+                "csrf_token": csrf_token,
+            }
+
     def validate_csrf_token(self, session_token: str, csrf_token: str) -> bool:
-        """
-        Проверяет CSRF токен для сессии.
-        
-        Args:
-            session_token: Токен сессии
-            csrf_token: CSRF токен из запроса
-            
-        Returns:
-            True если токен валиден
-        """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT csrf_token FROM sessions
-            WHERE token = ? AND expires_at > ?
-        """, (session_token, datetime.utcnow().isoformat()))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT csrf_token FROM sessions
+                WHERE token = ? AND expires_at > ?
+                """,
+                (session_token, utc_now_iso()),
+            )
+            result = cursor.fetchone()
         if not result:
             return False
-        
-        stored_csrf_token = result[0]
-        return CSRFProtection.validate_token(csrf_token, stored_csrf_token)
-    
+        return CSRFProtection.validate_token(csrf_token, result[0])
+
     def logout(self, token: str) -> bool:
-        """Удаляет сессию."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
-        deleted = cursor.rowcount > 0
-        
-        conn.commit()
-        conn.close()
-        return deleted
-    
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return cursor.rowcount > 0
+
     def has_permission(self, role: str, permission: str) -> bool:
-        """Проверяет наличие разрешения у роли."""
         return permission in self.ROLES.get(role, [])
-    
-    def log_action(self, user_id: Optional[int], username: Optional[str], 
-                   action: str, resource: Optional[str] = None,
-                   details: Optional[str] = None, ip_address: Optional[str] = None) -> None:
-        """Логирует действие пользователя."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO audit_log (user_id, username, action, resource, details, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (user_id, username, action, resource, details, ip_address))
-        
-        conn.commit()
-        conn.close()
-    
-    def get_audit_log(self, limit: int = 100, offset: int = 0,
-                     user_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Получает журнал аудита."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
+
+    def log_action(
+        self,
+        user_id: Optional[int],
+        username: Optional[str],
+        action: str,
+        resource: Optional[str] = None,
+        details: Optional[str] = None,
+        ip_address: Optional[str] = None,
+    ) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO audit_log (user_id, username, action, resource, details, ip_address)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, username, action, resource, details, ip_address),
+            )
+
+    def get_audit_log(self, limit: int = 100, offset: int = 0, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
         try:
-            # Строим запрос без использования f-string для безопасности
-            query = "SELECT * FROM audit_log"
-            params = []
-            
-            conditions = []
-            if user_id:
-                conditions.append("user_id = ?")
-                params.append(user_id)
-            
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-            
-            query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
-            params.extend([limit, offset])
-            
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            conn.close()
-            
-            return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting audit log: {e}", exc_info=True)
-            conn.close()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                query = "SELECT * FROM audit_log"
+                params = []
+                conditions = []
+                if user_id:
+                    conditions.append("user_id = ?")
+                    params.append(user_id)
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+                query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as exc:
+            logger.error("Error getting audit log: %s", exc, exc_info=True)
             return []
-    
+
     def create_user(self, username: str, password: str, role: str = "auditor") -> Tuple[bool, Optional[str]]:
-        """
-        Создает нового пользователя с валидацией.
-        
-        Args:
-            username: Имя пользователя
-            password: Пароль
-            role: Роль пользователя
-            
-        Returns:
-            (success, error_message)
-        """
-        # Валидация имени пользователя
         is_valid, error = InputSanitizer.validate_username(username)
         if not is_valid:
             return False, error
-        
-        # Валидация пароля
+
         is_valid, error = PasswordSecurity.validate_password_strength(password)
         if not is_valid:
             return False, error
-        
-        # Проверка роли
+
         if role not in self.ROLES:
-            return False, f"Недопустимая роль: {role}"
-        
-        # Санитизация
+            return False, f"Invalid role: {role}"
+
         username = InputSanitizer.sanitize_string(username, max_length=50)
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         try:
-            password_hash = self._hash_password(password)
-            now = datetime.utcnow().isoformat()
-            cursor.execute("""
-                INSERT INTO users (username, password_hash, role, password_changed_at)
-                VALUES (?, ?, ?, ?)
-            """, (username, password_hash, role, now))
-            conn.commit()
-            conn.close()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                password_hash = self._hash_password(password)
+                now = utc_now_iso()
+                cursor.execute(
+                    """
+                    INSERT INTO users (username, password_hash, role, password_changed_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (username, password_hash, role, now),
+                )
             return True, None
         except sqlite3.IntegrityError:
-            conn.rollback()
-            conn.close()
-            return False, "Пользователь с таким именем уже существует"
-        except Exception as e:
-            conn.rollback()
-            conn.close()
-            return False, f"Ошибка при создании пользователя: {str(e)}"
-    
-    def list_users(self) -> List[Dict[str, Any]]:
-        """Возвращает список пользователей."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT id, username, role, created_at, last_login FROM users")
-        rows = cursor.fetchall()
-        conn.close()
-        
-        return [dict(row) for row in rows]
+            return False, "User already exists"
+        except Exception as exc:
+            return False, f"Error creating user: {str(exc)}"
 
+    def list_users(self) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, username, role, created_at, last_login FROM users")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]

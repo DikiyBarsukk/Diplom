@@ -1,579 +1,269 @@
-# 📚 API Документация системы аудита логов
+﻿# API документация BARSUKSIEM
 
 ## Обзор
 
-Система предоставляет RESTful API для работы с логами и управления пользователями. API использует FastAPI, который автоматически генерирует OpenAPI/Swagger документацию.
+BARSUKSIEM использует FastAPI приложение, собираемое через `create_app()` в `server/app_factory.py`.
 
-**Базовый URL**: `http://localhost:8080`  
-**Версия API**: 0.4
-
----
+Канонические программные маршруты находятся под `/api/...`. HTML-страницы `/`, `/logs`, `/incidents`, `/analytics`, `/inventory`, `/compliance` не должны использоваться как программный API.
 
 ## Аутентификация
 
-Большинство эндпоинтов требуют аутентификации через сессионные токены.
+Модель доступа:
 
-### Процесс аутентификации:
-
-1. **Вход в систему** через `POST /api/auth/login`
-2. Получение `session_token` в cookie и `csrf_token` в заголовке ответа
-3. Использование `session_token` в cookie для последующих запросов
-4. Использование `csrf_token` в заголовке `X-CSRF-Token` для операций изменения данных
-
----
-
-## Публичные эндпоинты
-
-### GET /health
-
-Проверка доступности сервера (не требует аутентификации).
-
-**Response:**
-```json
-{
-    "status": "ok",
-    "host": "server-hostname",
-    "version": "0.4"
-}
-```
-
-**Example:**
-```bash
-curl http://localhost:8080/health
-```
-
----
-
-### POST /logs
-
-Прием логов от агентов (не требует аутентификации).
-
-**Request Body:**
-```json
-[
-    {
-        "host": "server1",
-        "source": "journal",
-        "message": "System started",
-        "ts": "2024-01-01T12:00:00Z",
-        "severity": "info"
-    }
-]
-```
-
-**Response:**
-```json
-{
-    "status": "ok",
-    "received": 1,
-    "saved": 1,
-    "skipped": 0
-}
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/logs \
-  -H "Content-Type: application/json" \
-  -d '[{"host": "server1", "message": "Test log", "ts": "2024-01-01T12:00:00Z"}]'
-```
-
----
-
-## Эндпоинты аутентификации
+- вход выполняется через `POST /api/auth/login`
+- сервер создает `session_token` cookie
+- для операций изменения данных используется CSRF header `X-CSRF-Token`
+- актуальный пользователь и CSRF token получаются через `GET /api/auth/me`
 
 ### POST /api/auth/login
 
-Аутентификация пользователя.
+Request body:
 
-**Request Body:**
 ```json
 {
+  "username": "admin",
+  "password": "Admin123!Test"
+}
+```
+
+Response `200 OK`:
+
+```json
+{
+  "status": "ok",
+  "token": "session-token",
+  "csrf_token": "csrf-token",
+  "user": {
+    "id": 1,
     "username": "admin",
-    "password": "Admin123!@#"
+    "role": "admin"
+  }
 }
 ```
 
-**Response:**
-```json
-{
-    "status": "ok",
-    "token": "session_token_here",
-    "csrf_token": "csrf_token_here",
-    "user": {
-        "id": 1,
-        "username": "admin",
-        "role": "admin"
-    }
-}
-```
-
-**Cookies:**
-- `session_token`: Токен сессии (HttpOnly, SameSite=Lax)
-
-**Headers:**
-- `X-CSRF-Token`: CSRF токен для защиты от CSRF атак
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "Admin123!@#"}' \
-  -c cookies.txt
-```
-
----
-
-### POST /api/auth/logout
-
-Выход из системы (требует аутентификации и CSRF токен).
-
-**Headers:**
-- `Cookie: session_token=...`
-- `X-CSRF-Token: ...`
-
-**Response:**
-```json
-{
-    "status": "ok"
-}
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/api/auth/logout \
-  -b cookies.txt \
-  -H "X-CSRF-Token: csrf_token_here"
-```
-
----
+Дополнительно сервер выставляет cookie `session_token` и дублирует CSRF token в header `X-CSRF-Token`.
 
 ### GET /api/auth/me
 
-Получение информации о текущем пользователе (требует аутентификации).
+Response `200 OK`:
 
-**Response:**
 ```json
 {
-    "id": 1,
-    "username": "admin",
-    "role": "admin",
-    "csrf_token": "csrf_token_here"
+  "id": 1,
+  "username": "admin",
+  "role": "admin",
+  "csrf_token": "csrf-token"
 }
 ```
 
-**Example:**
-```bash
-curl http://localhost:8080/api/auth/me -b cookies.txt
+### POST /api/auth/logout
+
+Требует валидную сессию и header `X-CSRF-Token`.
+
+Response `200 OK`:
+
+```json
+{
+  "status": "ok"
+}
 ```
 
----
+Без CSRF token сервер возвращает `403`.
 
-## Эндпоинты работы с логами
+## Публичные маршруты
+
+### GET /health
+
+Проверка состояния приложения.
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "host": "server-hostname",
+  "version": "0.5"
+}
+```
+
+### POST /api/logs
+
+Основной маршрут для приема логов от агента.
+
+Request body: массив нормализуемых или сырых событий.
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "received": 10,
+  "saved": 10,
+  "skipped": 0,
+  "incidents_detected": 1
+}
+```
+
+Примечание: `POST /logs` сохранен как compatibility alias, но в клиентах и документации нужно использовать `POST /api/logs`.
+
+## Защищенные маршруты
 
 ### GET /api/logs
 
-Получение логов с фильтрацией (требует аутентификации).
+Параметры:
 
-**Query Parameters:**
-- `host` (optional, string): Фильтр по имени хоста
-- `severity` (optional, string): Фильтр по уровню важности (emerg, alert, crit, err, warn, notice, info, debug)
-- `since` (optional, string): Фильтр по времени (ISO формат, например "2024-01-01T00:00:00Z")
-- `search` (optional, string): Поиск по содержимому сообщения (LIKE поиск)
-- `limit` (optional, int): Максимальное количество событий (по умолчанию 200, максимум 10000)
-- `offset` (optional, int): Смещение для пагинации (по умолчанию 0)
+- `host`
+- `severity`
+- `since`
+- `search`
+- `limit`
+- `offset`
 
-**Response:**
-```json
-[
-    {
-        "id": 1,
-        "hash": "abc123...",
-        "ts": "2024-01-01T12:00:00Z",
-        "host": "server1",
-        "source": "journal",
-        "severity": "info",
-        "message": "System started",
-        "unit": "systemd",
-        "process": "systemd",
-        "pid": 1,
-        "uid": 0,
-        "raw": {},
-        "ingest_ts": "2024-01-01T12:00:01Z"
-    }
-]
-```
+Возвращает список событий.
 
-**Examples:**
-```bash
-# Получить последние 100 логов
-curl "http://localhost:8080/api/logs?limit=100" -b cookies.txt
+### GET /api/stats
 
-# Фильтр по хосту и уровню важности
-curl "http://localhost:8080/api/logs?host=server1&severity=err" -b cookies.txt
+Возвращает сводную статистику по событиям.
 
-# Поиск по содержимому
-curl "http://localhost:8080/api/logs?search=error" -b cookies.txt
+Типичные поля ответа:
 
-# События за последние 24 часа
-curl "http://localhost:8080/api/logs?since=2024-01-01T00:00:00Z" -b cookies.txt
+- `total_events`
+- `severity`
+- `hosts`
+- агрегаты по источникам и единицам журнала
 
-# Пагинация
-curl "http://localhost:8080/api/logs?limit=50&offset=50" -b cookies.txt
-```
+`GET /stats` сохранен только как compatibility alias.
 
----
+### GET /api/incidents
 
-### GET /stats
+Параметры:
 
-Получение статистики по логам (требует аутентификации).
+- `incident_type`
+- `severity`
+- `status`
+- `search`
+- `since`
+- `limit`
+- `offset`
 
-**Response:**
-```json
-{
-    "total_events": 10000,
-    "hosts": {
-        "server1": 5000,
-        "server2": 5000
-    },
-    "severity": {
-        "info": 8000,
-        "warn": 1500,
-        "err": 500
-    },
-    "last_event_time": "2024-01-01T12:00:00Z"
-}
-```
+Возвращает список выявленных инцидентов.
 
-**Example:**
-```bash
-curl http://localhost:8080/stats -b cookies.txt
-```
+### GET /api/incidents/stats
 
----
+Возвращает агрегированную статистику по инцидентам, включая группировки по статусам и критичности.
+
+### GET /api/incidents/rules
+
+Возвращает список активных правил incident detection.
 
 ### GET /api/agents/stats
 
-Получение статистики по агентам (онлайн/оффлайн) с учетом окна активности (требует аутентификации).
+Параметр:
 
-**Query Parameters:**
-- `window_minutes` (optional, int): Окно активности в минутах (по умолчанию 5)
-
-**Response:**
-```json
-{
-    "total": 45,
-    "online": 42,
-    "offline": 3,
-    "window_minutes": 5,
-    "last_seen": {
-        "REMOTE-PC-001": "2024-01-01T12:00:00Z",
-        "REMOTE-PC-002": "2024-01-01T11:58:30Z"
-    }
-}
-```
-
-**Example:**
-```bash
-curl "http://localhost:8080/api/agents/stats?window_minutes=5" -b cookies.txt
-```
-
----
-
-## Эндпоинты аудита
+- `window_minutes` - окно оценки активности агентов
 
 ### GET /api/audit
 
-Получение журнала аудита (требует права `manage_users`, обычно только для админов).
+Доступен роли `admin` с permission `manage_users`.
 
-**Query Parameters:**
-- `limit` (optional, int): Максимальное количество записей (по умолчанию 100, максимум 1000)
-- `offset` (optional, int): Смещение для пагинации (по умолчанию 0)
+Параметры:
 
-**Response:**
-```json
-[
-    {
-        "id": 1,
-        "user_id": 1,
-        "username": "admin",
-        "action": "login_success",
-        "resource": null,
-        "details": null,
-        "ip_address": "127.0.0.1",
-        "timestamp": "2024-01-01T12:00:00Z"
-    }
-]
-```
+- `limit`
+- `offset`
 
-**Example:**
-```bash
-curl "http://localhost:8080/api/audit?limit=50" -b cookies.txt -H "X-CSRF-Token: csrf_token_here"
-```
+Возвращает журнал действий пользователей.
 
----
+## Формат события
 
-## Коды ошибок
-
-- **200 OK**: Успешный запрос
-- **400 Bad Request**: Неверный формат запроса
-- **401 Unauthorized**: Требуется аутентификация
-- **403 Forbidden**: Недостаточно прав или неверный CSRF токен
-- **404 Not Found**: Ресурс не найден
-- **500 Internal Server Error**: Внутренняя ошибка сервера
-
----
-
-## Форматы данных
-
-### Событие (Event)
+Нормализованное событие содержит поля вида:
 
 ```json
 {
-    "id": 1,
-    "hash": "sha1_hash_string",
-    "ts": "2024-01-01T12:00:00Z",
-    "host": "server1",
-    "source": "journal|eventlog|file",
-    "unit": "systemd",
-    "process": "systemd",
-    "pid": 1,
-    "uid": 0,
-    "severity": "emerg|alert|crit|err|warn|notice|info|debug",
-    "message": "Log message text",
-    "raw": {},
-    "ingest_ts": "2024-01-01T12:00:00Z"
+  "ts": "2026-03-16T12:00:00+00:00",
+  "host": "pc-01",
+  "source": "journal",
+  "unit": "sshd",
+  "process": "sshd",
+  "pid": 123,
+  "uid": 1000,
+  "severity": "warn",
+  "message": "authentication failed",
+  "raw": {},
+  "ingest_ts": "2026-03-16T12:00:03+00:00",
+  "hash": "..."
 }
 ```
 
-### Уровни важности (Severity)
+## Формат инцидента
 
-- `emerg` - Emergency (0)
-- `alert` - Alert (1)
-- `crit` - Critical (2)
-- `err` - Error (3)
-- `warn` - Warning (4)
-- `notice` - Notice (5)
-- `info` - Information (6)
-- `debug` - Debug (7)
+Типичный инцидент содержит:
 
----
+```json
+{
+  "id": 1,
+  "rule_id": "R001",
+  "incident_type": "brute_force",
+  "severity": "high",
+  "title": "Brute Force Attack on host",
+  "description": "...",
+  "host": "pc-01",
+  "detected_at": "2026-03-16T12:10:00+00:00"
+}
+```
 
-## Swagger/OpenAPI документация
+## Коды ошибок
 
-FastAPI автоматически генерирует интерактивную документацию:
+- `400` - некорректный запрос, например пустой список логов
+- `401` - отсутствует или невалидна аутентификация
+- `403` - нет прав или отсутствует CSRF token
+- `429` - превышен rate limit
+- `500` - внутренняя ошибка сервера
 
-- **Swagger UI**: `http://localhost:8080/docs`
-- **ReDoc**: `http://localhost:8080/redoc`
-- **OpenAPI JSON**: `http://localhost:8080/openapi.json`
-
----
-
-## Примеры использования
-
-### Python (requests)
+## Пример Python
 
 ```python
 import requests
 
-BASE_URL = "http://localhost:8080"
-
-# Вход в систему
-response = requests.post(
-    f"{BASE_URL}/api/auth/login",
-    json={"username": "admin", "password": "Admin123!@#"}
+session = requests.Session()
+login = session.post(
+    'http://127.0.0.1:8080/api/auth/login',
+    json={'username': 'admin', 'password': 'Admin123!Test'},
 )
-data = response.json()
-session_token = response.cookies.get("session_token")
-csrf_token = data["csrf_token"]
+login.raise_for_status()
+csrf_token = login.headers['X-CSRF-Token']
 
-# Получение логов
-headers = {"X-CSRF-Token": csrf_token}
-cookies = {"session_token": session_token}
-response = requests.get(
-    f"{BASE_URL}/api/logs",
-    params={"limit": 100, "severity": "err"},
-    headers=headers,
-    cookies=cookies
+stats = session.get('http://127.0.0.1:8080/api/stats')
+print(stats.json())
+
+logout = session.post(
+    'http://127.0.0.1:8080/api/auth/logout',
+    headers={'X-CSRF-Token': csrf_token},
 )
-logs = response.json()
-
-# Отправка логов (от агента)
-logs_data = [
-    {
-        "host": "server1",
-        "source": "journal",
-        "message": "Test log",
-        "ts": "2024-01-01T12:00:00Z"
-    }
-]
-response = requests.post(f"{BASE_URL}/logs", json=logs_data)
-result = response.json()
+logout.raise_for_status()
 ```
 
-### JavaScript (fetch)
+## Пример JavaScript
 
 ```javascript
-const BASE_URL = "http://localhost:8080";
-
-// Вход в систему
-const loginResponse = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    credentials: "include",
-    body: JSON.stringify({
-        username: "admin",
-        password: "Admin123!@#"
-    })
+const loginResponse = await fetch('/api/auth/login', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ username: 'admin', password: 'Admin123!Test' })
 });
-const loginData = await loginResponse.json();
-const csrfToken = loginData.csrf_token;
 
-// Получение логов
-const logsResponse = await fetch(
-    `${BASE_URL}/api/logs?limit=100&severity=err`,
-    {
-        headers: {"X-CSRF-Token": csrfToken},
-        credentials: "include"
-    }
-);
-const logs = await logsResponse.json();
+const csrfToken = loginResponse.headers.get('X-CSRF-Token');
+const statsResponse = await fetch('/api/stats', {
+  credentials: 'include'
+});
 ```
 
----
+## Проверенные сценарии
 
-## Безопасность
+Integration tests подтверждают:
 
-### Защита от атак
-
-- **Brute Force**: Rate limiting (5 попыток за 5 минут)
-- **CSRF**: CSRF токены для операций изменения данных
-- **SQL Injection**: Параметризованные запросы
-- **XSS**: Санитизация входных данных
-- **Timing Attacks**: Constant-time сравнение паролей
-
-### Security Headers
-
-Сервер автоматически устанавливает следующие заголовки:
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `X-XSS-Protection: 1; mode=block`
-- `Content-Security-Policy: ...`
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-
----
-
-## Эндпоинты анализа инцидентов ИБ
-
-### GET /api/incidents
-
-Получение списка инцидентов информационной безопасности с фильтрацией (требует аутентификации).
-
-**Query Parameters:**
-- `incident_type` (optional, string): Фильтр по типу инцидента (brute_force, unauthorized_access, suspicious_activity, log_tampering, privilege_escalation, anomaly, malware_indicator)
-- `severity` (optional, string): Фильтр по критичности (critical, high, medium, low, info)
-- `status` (optional, string): Фильтр по статусу (open, closed, investigating)
-- `search` (optional, string): Поиск по описанию, хосту, типу и идентификатору правила
-- `since` (optional, string): Фильтр по времени обнаружения (ISO формат)
-- `limit` (optional, int): Максимальное количество инцидентов (по умолчанию 100, максимум 1000)
-- `offset` (optional, int): Смещение для пагинации (по умолчанию 0)
-
-**Response:**
-```json
-[
-    {
-        "id": 1,
-        "rule_id": "R001",
-        "incident_type": "brute_force",
-        "severity": "high",
-        "title": "Brute Force Attack on server1",
-        "description": "Обнаружено 5 или более неудачных попыток входа за 10 минут",
-        "host": "server1",
-        "event_count": 5,
-        "detected_at": "2024-01-15T10:01:00Z",
-        "first_event_time": "2024-01-15T10:00:00Z",
-        "last_event_time": "2024-01-15T10:01:00Z",
-        "related_events": [1, 2, 3, 4, 5],
-        "correlation_pattern": null,
-        "status": "open"
-    }
-]
-```
-
-**Example:**
-```bash
-# Получить все критические инциденты
-curl "http://localhost:8080/api/incidents?severity=critical" -b cookies.txt
-
-# Получить инциденты brute force
-curl "http://localhost:8080/api/incidents?incident_type=brute_force" -b cookies.txt
-
-# Получить открытые инциденты за последние 24 часа
-curl "http://localhost:8080/api/incidents?status=open&since=2024-01-14T00:00:00Z" -b cookies.txt
-```
-
----
-
-### GET /api/incidents/rules
-
-Получение информации о всех правилах выявления инцидентов (требует аутентификации).
-
-**Response:**
-```json
-[
-    {
-        "rule_id": "R001",
-        "name": "Brute Force Attack Detection",
-        "description": "Обнаружено 5 или более неудачных попыток входа за 10 минут",
-        "severity": "high",
-        "incident_type": "brute_force"
-    }
-]
-```
-
-**Example:**
-```bash
-curl http://localhost:8080/api/incidents/rules -b cookies.txt
-```
-
----
-
-### GET /api/incidents/stats
-
-Получение статистики по инцидентам ИБ (требует аутентификации).
-
-**Response:**
-```json
-{
-    "total_incidents": 25,
-    "by_type": {
-        "brute_force": 10,
-        "suspicious_activity": 5,
-        "privilege_escalation": 2,
-        "log_tampering": 1
-    },
-    "by_severity": {
-        "critical": 3,
-        "high": 12,
-        "medium": 8,
-        "low": 2
-    },
-    "by_status": {
-        "open": 15,
-        "closed": 8,
-        "investigating": 2
-    },
-    "last_incident_time": "2024-01-15T10:01:00Z"
-}
-```
-
-**Example:**
-```bash
-curl http://localhost:8080/api/incidents/stats -b cookies.txt
-```
-
----
-
-**Версия документа**: 1.2  
-**Дата**: 2026-01-31
-
+- успешный login / me / logout
+- отказ logout без CSRF token
+- ingest demo логов
+- доступ к `/api/logs`, `/api/stats`, `/api/incidents`
+- отказ доступа к защищенным маршрутам без аутентификации

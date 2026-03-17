@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html class="dark" lang="ru">
 <head>
     <meta charset="utf-8"/>
@@ -29,10 +29,10 @@
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
             display: inline-block;
-            vertical-align: middle;
+        .sortable::after { content: ' ?'; opacity: 0.5; }
         }
-        .sortable { cursor: pointer; user-select: none; }
-        .sortable::after { content: ' ↕'; opacity: 0.5; }
+        .sortable.asc::after { content: ' ?'; opacity: 1; }
+        .sortable.desc::after { content: ' ?'; opacity: 1; }
         .sortable.asc::after { content: ' ↑'; opacity: 1; }
         .sortable.desc::after { content: ' ↓'; opacity: 1; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -51,9 +51,9 @@
         </div>
         <h2 class="text-lg font-bold leading-tight tracking-tight uppercase">BARSUKSIEM</h2>
         <nav class="ml-10 hidden md:flex items-center gap-6">
-            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/">Аудит ИБ</a>
+            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/">????? ??</a>
             <a class="text-primary text-sm font-semibold border-b-2 border-primary py-1" href="/logs">Обозреватель журналов</a>
-            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/incidents">События ИБ</a>
+            <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/incidents">??????? ??</a>
             <a class="text-slate-500 dark:text-[#92b7c9] text-sm font-medium hover:text-primary transition-colors" href="/analytics">Отчеты</a>
         </nav>
     </div>
@@ -105,7 +105,7 @@
                             <option value="err">Ошибка</option>
                             <option value="warn">Предупреждение</option>
                             <option value="notice">Уведомление</option>
-                            <option value="info">Информация</option>
+                            <option value="info">??????????</option>
                             <option value="debug">Отладка</option>
                         </select>
                     </div>
@@ -171,7 +171,7 @@
                 <div class="flex items-center gap-3">
                     <button id="refreshBtn" class="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-bold px-6 py-3 rounded-lg transition-all shadow-lg shadow-primary/20">
                         <span class="material-symbols-outlined">play_arrow</span>
-                        <span>АНАЛИЗ</span>
+                        <span>??????</span>
                     </button>
                     <button id="exportBtn" class="p-2 text-slate-500 dark:text-[#92b7c9] hover:bg-slate-100 dark:hover:bg-[#233c48] rounded transition-colors" title="Экспорт CSV">
                         <span class="material-symbols-outlined">download</span>
@@ -239,7 +239,7 @@
         </div>
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-500 mb-2">Интервал автообновления</label>
+                <label class="block text-sm font-medium text-slate-500 mb-2">???????? ??????????????</label>
                 <select id="refreshInterval" class="w-full bg-slate-100 dark:bg-[#233c48] border-none rounded-lg px-3 py-2 text-sm">
                     <option value="10">10 секунд</option>
                     <option value="30" selected>30 секунд</option>
@@ -255,6 +255,14 @@
         </div>
     </div>
 </div>
+<script src="/static/auth-client.js"></script>
+<script src="/static/app-shell.js"></script>
+<script src="/static/data-client.js"></script>
 <script src="/static/logs.js"></script>
 </body>
 </html>
+
+
+
+
+

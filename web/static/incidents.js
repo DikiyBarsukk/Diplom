@@ -1,188 +1,256 @@
-/**
- * Incident Management page - BARSUKSIEM
- */
-const API_BASE = window.location.origin;
-let csrfToken = null;
+﻿const {
+    apiBase: API_BASE,
+    authenticatedFetch,
+    checkPageAuth,
+    debounce,
+    escapeHtml,
+    formatDateTimeRu,
+    getSeverityBadgeClass,
+    getSeverityLabel,
+    getStatusBadgeClass,
+    getStatusMeta,
+    setupLogout,
+    setupGlobalSearch,
+    buildLogsUrl,
+    copyText,
+    persistRecentAction,
+    saveFavoriteFilter,
+    getFavoriteFilters,
+    setText,
+} = window.AppShell;
+const { getIncidentStats, getIncidents, fetchJson } = window.DataClient || {};
+
 let allIncidents = [];
+const PRESETS = [
+    { label: 'Открытые', params: { status: 'open' } },
+    { label: 'Критичные', params: { severity: 'critical' } },
+    { label: 'Brute Force', params: { incident_type: 'brute_force' } },
+    { label: 'Ночные логины', params: { incident_type: 'unauthorized_access' } },
+];
 
 document.addEventListener('DOMContentLoaded', async () => {
+    setupLogout('logoutBtn');
+    setupGlobalSearch('searchInput', (query) => `/incidents?search=${encodeURIComponent(query)}`);
+    installIncidentUx();
+    applyUrlFilters();
+    setupEventListeners();
     try {
-        await checkAuth();
+        await checkPageAuth({ usernameElementId: 'username', fallbackUsername: 'Аудитор' });
         await loadIncidentTypes();
         await loadIncidents();
-        setupEventListeners();
-        setupAutoRefresh();
-    } catch (e) {
-        console.error(e);
+    } catch (error) {
+        console.error(error);
     }
+    setInterval(loadIncidents, 30000);
 });
 
-async function checkAuth() {
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
-    if (res.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
+function installIncidentUx() {
+    const toolbar = document.querySelector('.flex.flex-wrap.items-center.justify-between.p-4.gap-4');
+    if (toolbar && !document.getElementById('incidentPresetFilters')) {
+        const presetBox = document.createElement('div');
+        presetBox.id = 'incidentPresetFilters';
+        presetBox.className = 'w-full flex flex-wrap gap-2 items-center';
+        presetBox.innerHTML = PRESETS.map((preset, index) => `
+            <button data-preset-index="${index}" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 dark:bg-[#233c48] border border-slate-200 dark:border-[#233c48] hover:bg-slate-200 dark:hover:bg-[#2d4d5c] transition-colors">${preset.label}</button>
+        `).join('') + `
+            <button id="incidentResetFiltersBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg border border-primary/40 text-primary hover:bg-primary/10 transition-colors">Сбросить фильтры</button>
+            <button id="incidentSaveFilterBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 dark:border-[#233c48] text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-[#233c48] transition-colors">Сохранить фильтр</button>
+            <span id="incidentResultSummary" class="text-xs text-slate-500 dark:text-[#92b7c9]"></span>
+        `;
+        toolbar.appendChild(presetBox);
     }
-    if (res.ok) {
-        const user = await res.json();
-        csrfToken = user.csrf_token || csrfToken;
-        document.getElementById('username').textContent = user.username || 'Аудитор';
+
+    const tableHeader = document.querySelector('table thead tr');
+    if (tableHeader && !document.getElementById('incidentActionsHeader')) {
+        const th = document.createElement('th');
+        th.id = 'incidentActionsHeader';
+        th.className = 'p-4 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-[#92b7c9] text-right';
+        th.textContent = 'Действия';
+        tableHeader.appendChild(th);
     }
+
+    const footer = document.getElementById('table-info')?.parentElement;
+    if (footer && !document.getElementById('incidentFavoritesWrap')) {
+        const wrap = document.createElement('div');
+        wrap.id = 'incidentFavoritesWrap';
+        wrap.className = 'px-4 py-3 border-t border-slate-200 dark:border-[#233c48] bg-white/40 dark:bg-[#101c22]/40';
+        wrap.innerHTML = '<div class="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-[#92b7c9] mb-2">Избранные фильтры</div><div id="incidentFavoriteFilters" class="flex flex-wrap gap-2"></div>';
+        footer.after(wrap);
+    }
+
+    document.getElementById('incidentPresetFilters')?.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-preset-index]');
+        if (!button) return;
+        applyFilters(PRESETS[Number(button.dataset.presetIndex)].params);
+        await loadIncidents();
+    });
+    document.getElementById('incidentResetFiltersBtn')?.addEventListener('click', async () => {
+        applyFilters({});
+        await loadIncidents();
+    });
+    document.getElementById('incidentSaveFilterBtn')?.addEventListener('click', () => {
+        saveFavoriteFilter({ name: `Инциденты ${new Date().toLocaleTimeString('ru-RU')}`, params: getCurrentFilters() });
+        renderFavoriteFilters();
+    });
+    renderFavoriteFilters();
 }
 
-async function authenticatedFetch(url, options = {}) {
-    const headers = {
-        ...options.headers
+function renderFavoriteFilters() {
+    const container = document.getElementById('incidentFavoriteFilters');
+    if (!container) return;
+    const items = getFavoriteFilters().filter((item) => item.params && ('status' in item.params || 'incident_type' in item.params || 'severity' in item.params));
+    if (!items.length) {
+        container.innerHTML = '<span class="text-xs text-slate-500 dark:text-[#92b7c9]">Нет сохраненных наборов</span>';
+        return;
+    }
+    container.innerHTML = items.map((item, index) => `<button data-favorite-index="${index}" class="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-[#233c48] hover:bg-slate-100 dark:hover:bg-[#233c48] transition-colors">${escapeHtml(item.name)}</button>`).join('');
+    container.onclick = async (event) => {
+        const button = event.target.closest('[data-favorite-index]');
+        if (!button) return;
+        applyFilters(items[Number(button.dataset.favoriteIndex)].params);
+        await loadIncidents();
     };
-    if (csrfToken && options.method && options.method !== 'GET') {
-        headers['X-CSRF-Token'] = csrfToken;
-    }
-    const res = await fetch(url, { ...options, credentials: 'include', headers });
-    if (res.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
-    }
-    return res;
 }
 
 function setupEventListeners() {
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
-        authenticatedFetch('/api/auth/logout', { method: 'POST' })
-            .catch(() => {})
-            .finally(() => {
-                window.location.href = '/login';
-            });
-    });
-
     document.getElementById('refreshBtn')?.addEventListener('click', loadIncidents);
     document.getElementById('severityFilter')?.addEventListener('change', loadIncidents);
     document.getElementById('statusFilter')?.addEventListener('change', loadIncidents);
     document.getElementById('typeFilter')?.addEventListener('change', loadIncidents);
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', debounce(() => {
-            loadIncidents();
-        }, 400));
-    }
+    document.getElementById('searchInput')?.addEventListener('input', debounce(loadIncidents, 400));
     document.getElementById('exportIncidentsBtn')?.addEventListener('click', exportIncidentsCsv);
+    document.getElementById('incidentsTableBody')?.addEventListener('click', async (event) => {
+        const action = event.target.closest('[data-action]');
+        const row = event.target.closest('tr[data-incident-id]');
+        if (!row) return;
+        const incidentId = row.dataset.incidentId;
+        const host = row.dataset.incidentHost || '';
+        if (action) {
+            if (action.dataset.action === 'open') {
+                window.location.href = `/incidents/details?id=${encodeURIComponent(incidentId)}`;
+            }
+            if (action.dataset.action === 'logs') {
+                const url = buildLogsUrl({ host, search: incidentId });
+                persistRecentAction({ title: `Связанные логи ${incidentId}`, url, ts: new Date().toISOString() });
+                window.location.href = url;
+            }
+            if (action.dataset.action === 'copy') {
+                await copyText(incidentId);
+                action.textContent = 'Скопировано';
+                setTimeout(() => { action.textContent = 'Скопировать ID'; }, 1200);
+            }
+            return;
+        }
+        window.location.href = `/incidents/details?id=${encodeURIComponent(incidentId)}`;
+    });
+}
+
+function getCurrentFilters() {
+    return {
+        severity: document.getElementById('severityFilter')?.value || '',
+        status: document.getElementById('statusFilter')?.value || '',
+        incident_type: document.getElementById('typeFilter')?.value || '',
+        search: document.getElementById('searchInput')?.value.trim() || '',
+    };
+}
+
+function applyUrlFilters() {
+    const params = new URLSearchParams(window.location.search);
+    applyFilters({
+        severity: params.get('severity') || '',
+        status: params.get('status') || '',
+        incident_type: params.get('incident_type') || '',
+        search: params.get('search') || '',
+    });
+}
+
+function applyFilters(filters) {
+    document.getElementById('severityFilter').value = filters.severity || '';
+    document.getElementById('statusFilter').value = filters.status || '';
+    document.getElementById('typeFilter').value = filters.incident_type || '';
+    document.getElementById('searchInput').value = filters.search || '';
+}
+
+function syncUrl(filters) {
+    const url = new URL(window.location.href);
+    ['severity', 'status', 'incident_type', 'search'].forEach((key) => {
+        if (filters[key]) url.searchParams.set(key, filters[key]);
+        else url.searchParams.delete(key);
+    });
+    window.history.replaceState({}, '', url);
 }
 
 async function loadIncidentTypes() {
     try {
-        const res = await authenticatedFetch(`${API_BASE}/api/incidents/rules`);
-        if (res.ok) {
-            const rules = await res.json();
-            const select = document.getElementById('typeFilter');
-            if (Array.isArray(rules) && select) {
-                const types = new Set();
-                rules.forEach(r => {
-                    const val = r.incident_type || r.rule_id || '';
-                    if (val && !types.has(val)) {
-                        types.add(val);
-                        const opt = document.createElement('option');
-                        opt.value = val;
-                        opt.textContent = r.name || r.rule_id || r.incident_type || val;
-                        select.appendChild(opt);
-                    }
-                });
-            }
+        const response = await authenticatedFetch(`${API_BASE}/api/incidents/rules`);
+        if (!response.ok) return;
+        const rules = await response.json();
+        const select = document.getElementById('typeFilter');
+        const currentValue = select.value;
+        if (select) {
+            const options = ['<option value="">Все</option>'];
+            const unique = new Map();
+            (rules || []).forEach((rule) => {
+                if (rule.incident_type && !unique.has(rule.incident_type)) unique.set(rule.incident_type, rule.name || rule.incident_type);
+            });
+            unique.forEach((name, value) => options.push(`<option value="${escapeHtml(value)}">${escapeHtml(name)}</option>`));
+            select.innerHTML = options.join('');
+            select.value = currentValue;
         }
-    } catch (e) {
-        console.warn('Could not load incident types', e);
+    } catch (error) {
+        console.warn('Could not load incident types', error);
     }
 }
 
 async function loadIncidents() {
-    const severity = document.getElementById('severityFilter')?.value;
-    const status = document.getElementById('statusFilter')?.value;
-    const type = document.getElementById('typeFilter')?.value;
-    const search = document.getElementById('searchInput')?.value?.trim();
-
-    let url = `${API_BASE}/api/incidents?limit=100`;
-    if (severity) url += `&severity=${severity}`;
-    if (status) url += `&status=${status}`;
-    if (type) url += `&incident_type=${type}`;
-    if (search) url += `&search=${encodeURIComponent(search)}`;
-
+    const filters = getCurrentFilters();
+    syncUrl(filters);
     try {
-        const res = await authenticatedFetch(url);
-        const incidents = res.ok ? await res.json() : [];
-
-        const statsRes = await authenticatedFetch(`${API_BASE}/api/incidents/stats`);
-        const stats = statsRes.ok ? await statsRes.json() : {};
-        const openCount = stats.by_status?.open ?? 0;
+        const incidents = await getIncidents({
+            severity: filters.severity || null,
+            status: filters.status || null,
+            incident_type: filters.incident_type || null,
+            search: filters.search || null,
+            limit: 100,
+        });
+        const statsResponse = await authenticatedFetch(`${API_BASE}/api/incidents/stats`);
+        const stats = statsResponse.ok ? await statsResponse.json() : {};
+        const openCount = stats.by_status?.open ?? stats.open ?? 0;
         const badge = document.getElementById('incidents-badge');
         if (badge) {
             badge.textContent = openCount;
             badge.style.display = openCount > 0 ? 'inline-flex' : 'none';
         }
-
-        allIncidents = incidents;
-        renderIncidents(incidents);
-        updateTableInfo(incidents.length);
-    } catch (e) {
-        document.getElementById('incidentsTableBody').innerHTML =
-            '<tr><td colspan="7" class="py-8 text-center text-danger">Ошибка загрузки инцидентов</td></tr>';
+        allIncidents = Array.isArray(incidents) ? incidents : [];
+        renderIncidents(allIncidents);
+        setText('table-info', allIncidents.length ? `Показано ${allIncidents.length} инцидентов` : 'Инциденты по выбранным фильтрам не найдены');
+        const parts = [];
+        if (filters.status) parts.push(`статус: ${filters.status}`);
+        if (filters.severity) parts.push(`важность: ${filters.severity}`);
+        if (filters.incident_type) parts.push(`тип: ${filters.incident_type}`);
+        if (filters.search) parts.push(`поиск: ${filters.search}`);
+        setText('incidentResultSummary', parts.length ? `Активные фильтры: ${parts.join(', ')}` : 'Без дополнительных фильтров');
+        persistRecentAction({ title: 'Инциденты', url: window.location.href, ts: new Date().toISOString() });
+    } catch (error) {
+        console.error(error);
+        document.getElementById('incidentsTableBody').innerHTML = '<tr><td colspan="8" class="p-6 text-center text-danger">Не удалось загрузить инциденты</td></tr>';
     }
 }
 
-function applySearchFilter() {
-    const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-    if (!query) return allIncidents;
-    return allIncidents.filter(inc => {
-        const fields = [
-            inc.title,
-            inc.description,
-            inc.details,
-            inc.host,
-            inc.incident_type,
-            inc.rule_id,
-            inc.id ? `INC-${inc.id}` : ''
-        ].filter(Boolean).join(' ').toLowerCase();
-        return fields.includes(query);
-    });
-}
-
-function debounce(fn, wait) {
-    let t;
-    return function (...args) {
-        clearTimeout(t);
-        t = setTimeout(() => fn.apply(this, args), wait);
-    };
-}
-
-function updateTableInfo(count) {
-    const info = document.getElementById('table-info');
-    if (info) info.textContent = `Показано: ${count}`;
-}
-
-function setupAutoRefresh() {
-    setInterval(loadIncidents, 30000);
-}
-
 function exportIncidentsCsv() {
-    const rows = applySearchFilter();
-    if (!rows.length) return;
+    if (!allIncidents.length) return;
     const header = ['ID', 'Название', 'Тип', 'Статус', 'Важность', 'Хост', 'Обнаружен'];
     const lines = [
         header.join(','),
-        ...rows.map(inc => {
-            const id = inc.id ? `INC-${inc.id}` : inc.rule_id || 'INC-—';
-            const status = (inc.status || 'open').toLowerCase();
-            const statusLabel = status === 'open' ? 'открыт' : status === 'investigating' ? 'расследуется' : 'закрыт';
-            const sev = (inc.severity || 'info').toLowerCase();
-            const sevLabel = sev === 'critical' ? 'критическая' : sev === 'high' ? 'высокая' : sev === 'medium' ? 'средняя' : sev === 'low' ? 'низкая' : 'инфо';
-            const detected = inc.detected_at ? new Date(inc.detected_at).toLocaleString('ru-RU') : '--';
-            return [
-                id,
-                inc.title || '',
-                inc.incident_type || '',
-                statusLabel,
-                sevLabel,
-                inc.host || '',
-                detected
-            ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
-        })
+        ...allIncidents.map((incident) => [
+            incident.id ? `INC-${incident.id}` : incident.rule_id || 'INC-—',
+            incident.title || '',
+            incident.incident_type || '',
+            getStatusMeta(incident.status).label,
+            getSeverityLabel(incident.severity),
+            incident.host || '',
+            formatDateTimeRu(incident.detected_at),
+        ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')),
     ];
     const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -193,51 +261,33 @@ function exportIncidentsCsv() {
 
 function renderIncidents(incidents) {
     const tbody = document.getElementById('incidentsTableBody');
-    if (!incidents || incidents.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-[#92b7c9]">Инциденты не найдены</td></tr>';
-        updateTableInfo(0);
+    if (!tbody) return;
+    if (!incidents.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-slate-500 dark:text-[#92b7c9]">Инциденты по выбранным фильтрам не найдены</td></tr>';
         return;
     }
 
-    tbody.innerHTML = incidents.map(inc => {
-        const sev = (inc.severity || 'info').toLowerCase();
-        const sevClass = sev === 'critical' ? 'bg-danger/20 text-danger' : sev === 'high' ? 'bg-warning/20 text-warning' : sev === 'medium' ? 'bg-primary/20 text-primary' : 'bg-success/20 text-success';
-        const status = (inc.status || 'open').toLowerCase();
-        const statusClass = status === 'open' ? 'text-danger' : status === 'investigating' ? 'text-warning' : 'text-success';
-        const sevLabel = sev === 'critical' ? 'критическая' : sev === 'high' ? 'высокая' : sev === 'medium' ? 'средняя' : sev === 'low' ? 'низкая' : 'инфо';
-        const statusLabel = status === 'open' ? 'открыт' : status === 'investigating' ? 'расследуется' : 'закрыт';
-        const detected = inc.detected_at ? new Date(inc.detected_at).toLocaleString('ru-RU') : '--';
-        const incidentId = inc.id ? `INC-${inc.id}` : inc.rule_id || 'INC-—';
-        const detailsUrl = `/incidents/details?id=${encodeURIComponent(incidentId)}`;
-
+    tbody.innerHTML = incidents.map((incident) => {
+        const incidentId = incident.id ? `INC-${incident.id}` : incident.rule_id || 'INC-—';
+        const statusMeta = getStatusMeta(incident.status);
+        const detected = formatDateTimeRu(incident.detected_at);
         return `
-            <tr class="border-b border-border-muted/50 hover:bg-surface/30">
-                <td class="py-3 px-4">
-                    <input class="rounded bg-slate-100 dark:bg-[#233c48] border-slate-300 dark:border-slate-700 text-primary focus:ring-primary/50" type="checkbox"/>
-                </td>
-                <td class="py-3 px-4 font-mono text-sm font-bold text-primary">
-                    <a class="hover:underline" href="${detailsUrl}">${escapeHtml(incidentId)}</a>
-                </td>
-                <td class="py-3 px-4">
-                    <div class="flex flex-col">
-                        <span class="text-sm font-semibold truncate">${escapeHtml(inc.title || 'Без названия')}</span>
-                        <span class="text-xs text-[#92b7c9] truncate">${escapeHtml(inc.description || inc.details || '')}</span>
+            <tr data-incident-id="${escapeHtml(incidentId)}" data-incident-host="${escapeHtml(incident.host || '')}" class="border-b border-border-muted/50 hover:bg-surface/30 cursor-pointer transition-colors">
+                <td class="py-3 px-4"><input class="rounded bg-slate-100 dark:bg-[#233c48] border-slate-300 dark:border-slate-700 text-primary focus:ring-primary/50" type="checkbox"/></td>
+                <td class="py-3 px-4 font-mono text-sm font-bold text-primary">${escapeHtml(incidentId)}</td>
+                <td class="py-3 px-4"><div class="flex flex-col"><span class="text-sm font-semibold truncate">${escapeHtml(incident.title || 'Без названия')}</span><span class="text-xs text-[#92b7c9] truncate">${escapeHtml(incident.description || incident.details || '')}</span></div></td>
+                <td class="py-3 px-4"><span class="px-2 py-1 rounded text-[10px] font-bold ${getStatusBadgeClass(incident.status)}">${statusMeta.label}</span></td>
+                <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getSeverityBadgeClass(incident.severity)}">${getSeverityLabel(incident.severity)}</span></td>
+                <td class="py-3 px-4 font-mono text-xs">${escapeHtml(incident.host || '--')}</td>
+                <td class="py-3 px-4 text-xs text-[#92b7c9]">${detected}</td>
+                <td class="py-3 px-4 text-right">
+                    <div class="flex justify-end gap-2">
+                        <button data-action="open" class="text-xs font-bold text-primary hover:underline">Открыть</button>
+                        <button data-action="logs" class="text-xs font-bold text-slate-500 dark:text-[#92b7c9] hover:text-primary">Связанные логи</button>
+                        <button data-action="copy" class="text-xs font-bold text-slate-500 dark:text-[#92b7c9] hover:text-primary">Скопировать ID</button>
                     </div>
                 </td>
-                <td class="py-3 px-4 ${statusClass} capitalize">${statusLabel}</td>
-                <td class="py-3 px-4">
-                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${sevClass}">${sevLabel}</span>
-                </td>
-                <td class="py-3 px-4 font-mono text-xs">${escapeHtml(inc.host || '--')}</td>
-                <td class="py-3 px-4 text-xs text-[#92b7c9]">${detected}</td>
             </tr>
         `;
     }).join('');
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }

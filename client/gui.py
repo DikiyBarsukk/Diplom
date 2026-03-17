@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
@@ -50,6 +50,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.resize(1400, 800)
 
         self.client = ServerClient(server_url)
+        self.connection_status = "не проверено"
 
         # Создаем вкладки
         self.tabs = QtWidgets.QTabWidget()
@@ -68,7 +69,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(self.dashboard_tab, "Dashboard")
 
         # initial fetch
-        QtCore.QTimer.singleShot(100, self.on_fetch_clicked)
+        QtCore.QTimer.singleShot(100, self.check_connection)
+        QtCore.QTimer.singleShot(250, self.on_fetch_clicked)
 
     def _setup_logs_tab(self, layout: QtWidgets.QVBoxLayout):
         """Настройка вкладки с логами."""
@@ -127,14 +129,20 @@ class MainWindow(QtWidgets.QMainWindow):
         # Кнопка обновления
         self.refresh_btn = QtWidgets.QPushButton("Fetch")
         ctrl_layout.addWidget(self.refresh_btn)
+
+        self.check_connection_btn = QtWidgets.QPushButton("Check Connection")
+        ctrl_layout.addWidget(self.check_connection_btn)
         
         # Дашборд
         self.dashboard_btn = QtWidgets.QPushButton("Dashboard")
         ctrl_layout.addWidget(self.dashboard_btn)
         
         ctrl_layout.addStretch()
-        self.status_label = QtWidgets.QLabel("")
+        self.status_label = QtWidgets.QLabel("Готов к загрузке")
         ctrl_layout.addWidget(self.status_label)
+        self.connection_label = QtWidgets.QLabel("Соединение: не проверено")
+        self.connection_label.setStyleSheet("color: #64748b; font-weight: 600;")
+        ctrl_layout.addWidget(self.connection_label)
 
         layout.addLayout(ctrl_layout)
 
@@ -149,6 +157,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self.table)
 
         self.refresh_btn.clicked.connect(self.on_fetch_clicked)
+        self.check_connection_btn.clicked.connect(self.check_connection)
         self.dashboard_btn.clicked.connect(self.show_dashboard)
 
     def _setup_dashboard_tab(self, layout: QtWidgets.QVBoxLayout):
@@ -245,9 +254,11 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             self.model.set_rows(events)
             self.status_label.setText(f"Loaded: {len(events)} events")
+            self.set_connection_state(True, "API доступен")
         except Exception as ex:
             logger.error(f"Error fetching logs: {ex}", exc_info=True)
             self.status_label.setText(f"Error: {ex}")
+            self.set_connection_state(False, str(ex))
 
     def on_row_double_clicked(self, index: QtCore.QModelIndex):
         """Показывает детальную информацию о событии."""
@@ -317,6 +328,22 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as ex:
             logger.error(f"Failed to update dashboard: {ex}", exc_info=True)
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update dashboard: {ex}")
+
+    def set_connection_state(self, is_ok: bool, message: str):
+        self.connection_status = message
+        self.connection_label.setText(f"Соединение: {message}")
+        color = "#16a34a" if is_ok else "#dc2626"
+        self.connection_label.setStyleSheet(f"color: {color}; font-weight: 700;")
+
+    def check_connection(self):
+        try:
+            self.client.health()
+            self.set_connection_state(True, "сервер доступен")
+            if not self.client.username or not self.client.password:
+                self.status_label.setText("Set BARSUKSIEM_CLIENT_USERNAME and BARSUKSIEM_CLIENT_PASSWORD for protected API")
+        except Exception as ex:
+            self.set_connection_state(False, f"ошибка: {ex}")
+            self.status_label.setText("Не удалось проверить соединение с сервером")
 
     def _update_severity_chart(self, stats: Dict[str, Any]):
         """Обновляет график распределения по severity."""
@@ -455,6 +482,8 @@ def run_app(server_url: str) -> None:
     win = MainWindow(server_url)
     win.show()
     app.exec()
+
+
 
 
 

@@ -1,365 +1,390 @@
-// API Base URL
-const API_BASE = window.location.origin;
+﻿const {
+    apiBase: API_BASE,
+    authenticatedFetch,
+    checkPageAuth,
+    debounce,
+    escapeHtml,
+    formatDateTimeRu,
+    getSeverityBadgeClass,
+    getSeverityLabel,
+    setText,
+    setupLogout,
+    persistRecentAction,
+    saveFavoriteFilter,
+    getFavoriteFilters,
+    buildLogsUrl,
+    setupGlobalSearch,
+} = window.AppShell;
+const { getLogs, getStats } = window.DataClient;
 
-// State management
+let allEvents = [];
 let currentPage = 1;
 let pageSize = 50;
-let totalEvents = 0;
 let currentSort = { field: 'ts', direction: 'desc' };
-let allEvents = [];
-let autoRefreshInterval = null;
-let initialFilters = null;
-let refreshInterval = 30000; // 30 seconds default
+let refreshInterval = 30000;
+let autoRefreshTimer = null;
 
-// Initialize logs page
-document.addEventListener('DOMContentLoaded', () => {
+const PRESETS = [
+    { label: 'Критичные', params: { severity: 'crit', time: '24h' } },
+    { label: 'За 1 час', params: { time: '1h' } },
+    { label: '4625', params: { search: '4625', time: '24h' } },
+    { label: 'Ошибки входа', params: { search: 'login_failed', time: '24h' } },
+    { label: 'PowerShell', params: { search: 'powershell', time: '24h' } },
+    { label: 'Этот хост', params: { host: 'CURRENT_HOST', time: '24h' } },
+];
+
+document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    checkAuth();
-    initialFilters = getUrlFilters();
-    loadStats();
+    setupLogout('logoutBtn');
+    setupGlobalSearch('searchInput', (query) => buildLogsUrl({ search: query }));
+    installQuickActions();
     setupEventListeners();
-    setupAutoRefresh();
-});
-
-// Проверка аутентификации
-async function checkAuth() {
+    applyUrlFilters();
     try {
-        const response = await fetch('/api/auth/me', {
-            credentials: 'include'
-        });
-        
-        if (response.status === 401) {
-            window.location.href = '/login';
-            return;
-        }
-        
-        if (response.ok) {
-            const user = await response.json();
-            document.getElementById('username').textContent = user.username || 'Аудитор';
-        }
+        await checkPageAuth({ usernameElementId: 'username', fallbackUsername: 'Аудитор' });
+        await loadStats();
+        await loadLogs();
+        setupAutoRefresh();
     } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error(error);
     }
-}
-
-// Обертка для fetch с обработкой ошибок аутентификации и CSRF защитой
-let csrfToken = null;
-
-async function authenticatedFetch(url, options = {}) {
-    if (!csrfToken && options.method && options.method !== 'GET') {
-        const meResponse = await fetch('/api/auth/me', {
-            credentials: 'include'
-        });
-        csrfToken = meResponse.headers.get('X-CSRF-Token');
-    }
-    
-    const headers = {
-        ...options.headers,
-        'Content-Type': 'application/json'
-    };
-    
-    if (csrfToken && options.method && options.method !== 'GET') {
-        headers['X-CSRF-Token'] = csrfToken;
-    }
-    
-    const response = await fetch(url, {
-        ...options,
-        credentials: 'include',
-        headers: headers
-    });
-    
-    const newCsrfToken = response.headers.get('X-CSRF-Token');
-    if (newCsrfToken) {
-        csrfToken = newCsrfToken;
-    }
-    
-    if (response.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
-    }
-    
-    return response;
-}
+});
 
 function initTheme() {
     const savedTheme = localStorage.getItem('theme');
+    const toggle = document.getElementById('themeToggle');
     if (savedTheme === 'dark') {
         document.body.classList.add('dark-theme');
-        document.getElementById('themeToggle').textContent = '☀️';
+        if (toggle) toggle.textContent = '☀️';
+    } else if (toggle) {
+        toggle.textContent = '🌙';
     }
 }
 
 function setupEventListeners() {
-    // Refresh button
-    document.getElementById('refreshBtn').addEventListener('click', () => {
+    document.getElementById('refreshBtn')?.addEventListener('click', async () => {
         currentPage = 1;
-        loadLogs();
+        await loadLogs();
     });
-    
-    // Filters
-    document.getElementById('severityFilter').addEventListener('change', () => {
-        currentPage = 1;
-        loadLogs();
+    document.getElementById('severityFilter')?.addEventListener('change', onFilterChanged);
+    document.getElementById('hostFilter')?.addEventListener('change', onFilterChanged);
+    document.getElementById('timeFilter')?.addEventListener('change', () => {
+        handleTimeFilterChange();
+        onFilterChanged();
     });
-    document.getElementById('hostFilter').addEventListener('change', () => {
-        currentPage = 1;
-        loadLogs();
-    });
-    document.getElementById('timeFilter').addEventListener('change', handleTimeFilterChange);
-    document.getElementById('searchInput').addEventListener('input', debounce(() => {
-        currentPage = 1;
-        loadLogs();
-    }, 500));
-    
-    // Pagination
-    document.getElementById('prevPage').addEventListener('click', () => {
+    document.getElementById('searchInput')?.addEventListener('input', debounce(onFilterChanged, 400));
+    document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
+    document.getElementById('prevPage')?.addEventListener('click', () => {
         if (currentPage > 1) {
-            currentPage--;
+            currentPage -= 1;
             sortAndDisplayEvents();
         }
     });
-    document.getElementById('nextPage').addEventListener('click', () => {
-        if (currentPage < Math.ceil(totalEvents / pageSize)) {
-            currentPage++;
+    document.getElementById('nextPage')?.addEventListener('click', () => {
+        const totalPages = Math.max(1, Math.ceil(allEvents.length / pageSize));
+        if (currentPage < totalPages) {
+            currentPage += 1;
             sortAndDisplayEvents();
         }
     });
-    
-    // Sorting
-    document.querySelectorAll('.sortable').forEach(header => {
+    document.querySelectorAll('.sortable').forEach((header) => {
         header.addEventListener('click', () => {
             const field = header.dataset.sort;
-            if (currentSort.field === field) {
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSort.field = field;
-                currentSort.direction = 'desc';
-            }
+            if (!field) return;
+            currentSort = currentSort.field === field
+                ? { field, direction: currentSort.direction === 'asc' ? 'desc' : 'asc' }
+                : { field, direction: 'desc' };
             updateSortIndicators();
             sortAndDisplayEvents();
         });
     });
-    
-    // Table row clicks
-    document.getElementById('logsTableBody').addEventListener('click', (e) => {
-        const row = e.target.closest('tr');
-        if (row && row.dataset.eventIndex !== undefined) {
-            showEventDetails(parseInt(row.dataset.eventIndex));
-        }
+    document.getElementById('logsTableBody')?.addEventListener('click', (event) => {
+        const row = event.target.closest('tr');
+        if (!row || row.dataset.eventIndex === undefined) return;
+        showEventDetails(Number(row.dataset.eventIndex));
     });
-    
-    // Modal close
-    document.getElementById('modalClose').addEventListener('click', closeEventModal);
-    document.getElementById('settingsClose').addEventListener('click', closeSettingsModal);
-    
-    // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
-    
-    // Settings
-    document.getElementById('settingsBtn').addEventListener('click', showSettings);
-    document.getElementById('settingsSidebarBtn').addEventListener('click', showSettings);
-    document.getElementById('refreshInterval').addEventListener('change', updateRefreshInterval);
-    document.getElementById('autoRefreshEnabled').addEventListener('change', toggleAutoRefresh);
-    
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-        try {
-            await authenticatedFetch('/api/auth/logout', { method: 'POST' });
-            window.location.href = '/login';
-        } catch (error) {
-            window.location.href = '/login';
-        }
-    });
-    
-    // Export
-    document.getElementById('exportBtn').addEventListener('click', exportToCSV);
-    
-    // Close modals on outside click
-    window.addEventListener('click', (e) => {
+    document.getElementById('modalClose')?.addEventListener('click', closeEventModal);
+    document.getElementById('settingsClose')?.addEventListener('click', closeSettingsModal);
+    document.getElementById('settingsBtn')?.addEventListener('click', showSettings);
+    document.getElementById('settingsSidebarBtn')?.addEventListener('click', showSettings);
+    document.getElementById('refreshInterval')?.addEventListener('change', updateRefreshInterval);
+    document.getElementById('autoRefreshEnabled')?.addEventListener('change', toggleAutoRefresh);
+    window.addEventListener('click', (event) => {
         const eventModal = document.getElementById('eventModal');
         const settingsModal = document.getElementById('settingsModal');
-        if (e.target === eventModal) closeEventModal();
-        if (e.target === settingsModal) closeSettingsModal();
+        if (event.target === eventModal) closeEventModal();
+        if (event.target === settingsModal) closeSettingsModal();
     });
 }
 
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+async function onFilterChanged() {
+    currentPage = 1;
+    await loadLogs();
+}
+
+function installQuickActions() {
+    const controlsRow = document.querySelector('main .p-4.space-y-4 > .flex.justify-between.items-center');
+    if (controlsRow && !document.getElementById('presetFilters')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex flex-wrap gap-2 items-center';
+        wrapper.id = 'presetFilters';
+        wrapper.innerHTML = PRESETS.map((preset, index) => `
+            <button data-preset-index="${index}" class="px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-[#233c48] border border-slate-200 dark:border-[#233c48] rounded hover:bg-slate-200 dark:hover:bg-[#2d4a58] transition-colors">
+                ${preset.label}
+            </button>
+        `).join('') + `
+            <button id="resetFiltersBtn" class="px-3 py-1.5 text-xs font-bold text-primary border border-primary/40 rounded hover:bg-primary/10 transition-colors">Сбросить фильтры</button>
+            <button id="saveFilterBtn" class="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-200 border border-slate-300 dark:border-[#233c48] rounded hover:bg-slate-100 dark:hover:bg-[#233c48] transition-colors">Сохранить фильтр</button>
+        `;
+        controlsRow.prepend(wrapper);
+    }
+
+    const infoRow = document.querySelector('main .p-4.space-y-4');
+    if (infoRow && !document.getElementById('resultsSummary')) {
+        const summary = document.createElement('div');
+        summary.id = 'resultsSummary';
+        summary.className = 'text-xs font-medium text-slate-500 dark:text-[#92b7c9]';
+        infoRow.appendChild(summary);
+    }
+
+    const sidebarSection = document.querySelector('aside .pt-6.border-t');
+    if (sidebarSection && !document.getElementById('favoriteFilters')) {
+        const box = document.createElement('div');
+        box.id = 'favoriteFilters';
+        box.className = 'mt-4 space-y-2';
+        box.innerHTML = '<h4 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-[#92b7c9]">Избранные фильтры</h4><div id="favoriteFiltersList" class="space-y-1"></div>';
+        sidebarSection.before(box);
+    }
+
+    document.getElementById('presetFilters')?.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-preset-index]');
+        if (!button) return;
+        const preset = PRESETS[Number(button.dataset.presetIndex)];
+        applyPreset(preset);
+        await loadLogs();
+    });
+    document.getElementById('resetFiltersBtn')?.addEventListener('click', async () => {
+        resetFilters();
+        await loadLogs();
+    });
+    document.getElementById('saveFilterBtn')?.addEventListener('click', () => {
+        saveFavoriteFilter({
+            name: `Фильтр ${new Date().toLocaleTimeString('ru-RU')}`,
+            params: getCurrentFilters(),
+        });
+        renderFavoriteFilters();
+    });
+    renderFavoriteFilters();
+}
+
+function renderFavoriteFilters() {
+    const container = document.getElementById('favoriteFiltersList');
+    if (!container) return;
+    const filters = getFavoriteFilters();
+    if (!filters.length) {
+        container.innerHTML = '<p class="text-xs text-slate-500 dark:text-[#92b7c9]">Сохраненных фильтров пока нет</p>';
+        return;
+    }
+    container.innerHTML = filters.map((filter, index) => `
+        <button data-favorite-index="${index}" class="w-full text-left px-3 py-2 rounded border border-slate-200 dark:border-[#233c48] text-xs hover:bg-slate-50 dark:hover:bg-[#233c48] transition-colors">
+            ${escapeHtml(filter.name)}
+        </button>
+    `).join('');
+    container.onclick = async (event) => {
+        const button = event.target.closest('[data-favorite-index]');
+        if (!button) return;
+        const selected = filters[Number(button.dataset.favoriteIndex)];
+        applyFilters(selected.params || {});
+        await loadLogs();
     };
 }
 
-function handleTimeFilterChange() {
-    const timeFilter = document.getElementById('timeFilter').value;
-    const customRange = document.getElementById('customDateRange');
-    if (timeFilter === 'custom') {
-        customRange.style.display = 'flex';
-    } else {
-        customRange.style.display = 'none';
-        currentPage = 1;
-        loadLogs();
+function applyPreset(preset) {
+    const params = { ...preset.params };
+    if (params.host === 'CURRENT_HOST') {
+        params.host = document.getElementById('hostFilter')?.value || '';
     }
+    applyFilters(params);
 }
 
-async function loadStats() {
-    try {
-        const response = await authenticatedFetch(`${API_BASE}/stats`);
-        const stats = await response.json();
-        updateHostFilter(stats);
-        
-        // Update alert count
-        const severityCounts = stats.severity || {};
-        const criticalCount = (severityCounts.emerg || 0) + 
-                             (severityCounts.alert || 0) + 
-                             (severityCounts.crit || 0);
-        document.getElementById('alert-count').textContent = criticalCount;
-        applyInitialFilters();
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
+function applyUrlFilters() {
+    applyFilters(getUrlFilters());
 }
 
-function updateHostFilter(stats) {
-    const hostFilter = document.getElementById('hostFilter');
-    const hosts = Object.keys(stats.hosts || {}).sort();
-    
-    hostFilter.innerHTML = '<option value="">Все хосты</option>';
-    
-    hosts.forEach(host => {
-        const option = document.createElement('option');
-        option.value = host;
-        option.textContent = host;
-        hostFilter.appendChild(option);
-    });
+function applyFilters(filters = {}) {
+    document.getElementById('hostFilter').value = filters.host || '';
+    document.getElementById('severityFilter').value = filters.severity || '';
+    document.getElementById('searchInput').value = filters.search || '';
+    document.getElementById('timeFilter').value = filters.time || '24h';
+    handleTimeFilterChange();
+}
+
+function resetFilters() {
+    applyFilters({ host: '', severity: '', search: '', time: '24h' });
 }
 
 function getUrlFilters() {
     const params = new URLSearchParams(window.location.search);
     return {
         host: params.get('host') || '',
-        search: params.get('search') || '',
         severity: params.get('severity') || '',
-        time: params.get('time') || '',
-        applied: false
+        search: params.get('search') || '',
+        time: params.get('time') || '24h',
     };
 }
 
-function applyInitialFilters() {
-    if (!initialFilters || initialFilters.applied) return;
-    const searchInput = document.getElementById('searchInput');
-    const severityFilter = document.getElementById('severityFilter');
-    const timeFilter = document.getElementById('timeFilter');
-    const hostFilter = document.getElementById('hostFilter');
+function getCurrentFilters() {
+    return {
+        host: document.getElementById('hostFilter').value,
+        severity: document.getElementById('severityFilter').value,
+        search: document.getElementById('searchInput').value.trim(),
+        time: document.getElementById('timeFilter').value,
+    };
+}
 
-    if (searchInput && initialFilters.search) searchInput.value = initialFilters.search;
-    if (severityFilter && initialFilters.severity) severityFilter.value = initialFilters.severity;
-    if (timeFilter && initialFilters.time) timeFilter.value = initialFilters.time;
-    if (hostFilter && initialFilters.host) hostFilter.value = initialFilters.host;
+function syncUrl(filters) {
+    const url = new URL(window.location.href);
+    ['host', 'severity', 'search', 'time'].forEach((key) => {
+        if (filters[key]) url.searchParams.set(key, filters[key]);
+        else url.searchParams.delete(key);
+    });
+    window.history.replaceState({}, '', url);
+}
 
-    initialFilters.applied = true;
-    loadLogs();
+function handleTimeFilterChange() {
+    const timeFilter = document.getElementById('timeFilter').value;
+    const customRange = document.getElementById('customDateRange');
+    if (customRange) {
+        customRange.classList.toggle('hidden', timeFilter !== 'custom');
+    }
+}
+
+function getSinceValue() {
+    const timeFilter = document.getElementById('timeFilter').value;
+    const now = Date.now();
+    const mapping = {
+        '1h': 3600000,
+        '6h': 21600000,
+        '24h': 86400000,
+        '7d': 604800000,
+    };
+    if (mapping[timeFilter]) {
+        return new Date(now - mapping[timeFilter]).toISOString();
+    }
+    if (timeFilter === 'custom') {
+        return document.getElementById('dateFrom').value ? new Date(document.getElementById('dateFrom').value).toISOString() : null;
+    }
+    return null;
+}
+
+async function loadStats() {
+    try {
+        const stats = await getStats();
+        const hosts = stats.hosts || {};
+        const hostFilter = document.getElementById('hostFilter');
+        if (!hostFilter) return;
+        const currentValue = hostFilter.value;
+        hostFilter.innerHTML = '<option value="">Все хосты</option>' + Object.keys(hosts).sort().map((host) => `<option value="${escapeHtml(host)}">${escapeHtml(host)}</option>`).join('');
+        hostFilter.value = currentValue;
+    } catch (error) {
+        console.error('Stats load failed', error);
+    }
 }
 
 async function loadLogs() {
+    const filters = getCurrentFilters();
+    syncUrl(filters);
     try {
-        const severity = document.getElementById('severityFilter').value;
-        const host = document.getElementById('hostFilter').value;
-        const search = document.getElementById('searchInput').value;
-        const timeFilter = document.getElementById('timeFilter').value;
-        
-        let url = `${API_BASE}/api/logs?limit=10000`;
-        if (severity) url += `&severity=${severity}`;
-        if (host) url += `&host=${encodeURIComponent(host)}`;
-        if (search) url += `&search=${encodeURIComponent(search)}`;
-        
-        if (timeFilter && timeFilter !== 'custom') {
-            const since = getSinceDate(timeFilter);
-            if (since) url += `&since=${since}`;
-        } else if (timeFilter === 'custom') {
-            const dateFrom = document.getElementById('dateFrom').value;
-            if (dateFrom) {
-                url += `&since=${new Date(dateFrom).toISOString()}`;
-            }
-        }
-        
-        document.getElementById('table-info').textContent = 'Загрузка...';
-        const response = await authenticatedFetch(url);
-        const events = await response.json();
-        
-        allEvents = events;
-        totalEvents = events.length;
+        const logs = await getLogs({
+            host: filters.host || null,
+            severity: filters.severity || null,
+            since: getSinceValue(),
+            search: filters.search || null,
+            limit: 500,
+        });
+        allEvents = Array.isArray(logs) ? logs : [];
+        persistRecentAction({ title: filters.search ? `Логи: ${filters.search}` : 'Логи', url: window.location.href, ts: new Date().toISOString() });
         sortAndDisplayEvents();
+        updateResultsSummary();
+        const lastTs = allEvents[0]?.ts || null;
+        setText('table-info', allEvents.length ? `Найдено ${allEvents.length}` : 'Событий пока нет');
+        setText('agentSync', lastTs ? `Последнее событие ${window.AppShell.formatAgo(lastTs)}` : '--');
     } catch (error) {
         console.error('Error loading logs:', error);
-        document.getElementById('table-info').textContent = 'Ошибка загрузки данных';
+        renderStateRow('Не удалось загрузить события. Проверьте соединение и повторите попытку.', 'danger');
+        setText('table-info', 'Ошибка загрузки');
     }
 }
 
-function getSinceDate(period) {
-    const now = new Date();
-    let since;
-    
-    switch(period) {
-        case '1h':
-            since = new Date(now.getTime() - 60 * 60 * 1000);
-            break;
-        case '6h':
-            since = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-            break;
-        case '24h':
-            since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            break;
-        case '7d':
-            since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            break;
-        default:
-            return null;
-    }
-    
-    return since.toISOString();
+function updateResultsSummary() {
+    const summary = document.getElementById('resultsSummary');
+    if (!summary) return;
+    const filters = getCurrentFilters();
+    const parts = [];
+    if (filters.host) parts.push(`хост: ${filters.host}`);
+    if (filters.severity) parts.push(`уровень: ${filters.severity}`);
+    if (filters.search) parts.push(`поиск: ${filters.search}`);
+    parts.push(`период: ${filters.time}`);
+    summary.textContent = allEvents.length
+        ? `Показано ${allEvents.length} событий. Активные фильтры: ${parts.join(', ')}`
+        : 'Событий по выбранным фильтрам не найдено';
+}
+
+function renderStateRow(message, tone = 'muted') {
+    const tbody = document.getElementById('logsTableBody');
+    if (!tbody) return;
+    const textClass = tone === 'danger' ? 'text-danger' : 'text-slate-500';
+    tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center ${textClass}">${escapeHtml(message)}</td></tr>`;
 }
 
 function sortAndDisplayEvents() {
-    const sorted = [...allEvents].sort((a, b) => {
-        let aVal = a[currentSort.field];
-        let bVal = b[currentSort.field];
-        
+    if (!allEvents.length) {
+        renderStateRow('Событий по выбранным фильтрам не найдено');
+        updatePagination(0);
+        return;
+    }
+    const sorted = [...allEvents].sort((left, right) => {
+        let aVal = left[currentSort.field];
+        let bVal = right[currentSort.field];
         if (currentSort.field === 'ts') {
             aVal = new Date(aVal || 0).getTime();
             bVal = new Date(bVal || 0).getTime();
         }
-        
-        if (currentSort.field === 'pid') {
-            aVal = parseInt(aVal) || 0;
-            bVal = parseInt(bVal) || 0;
-        }
-        
-        if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-        if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-        
-        if (currentSort.direction === 'asc') {
-            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-        } else {
-            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-        }
+        if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+        return 0;
     });
-    
     const start = (currentPage - 1) * pageSize;
-    const end = start + pageSize;
-    const paginated = sorted.slice(start, end);
-    
-    displayLogs(paginated);
-    updatePaginationInfo(sorted.length);
+    const paged = sorted.slice(start, start + pageSize);
+    renderRows(paged, start);
+    updatePagination(sorted.length);
+}
+
+function renderRows(events, offset) {
+    const tbody = document.getElementById('logsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = events.map((event, index) => `
+        <tr data-event-index="${offset + index}" class="hover:bg-slate-50 dark:hover:bg-[#233c48]/30 cursor-pointer transition-colors">
+            <td class="px-4 py-3 text-xs font-mono">${escapeHtml(formatDateTimeRu(event.ts))}</td>
+            <td class="px-4 py-3"><span class="px-2 py-1 rounded text-[10px] font-bold ${getSeverityBadgeClass(event.severity)}">${getSeverityLabel(event.severity)}</span></td>
+            <td class="px-4 py-3 text-xs font-mono">${escapeHtml(event.host || '--')}</td>
+            <td class="px-4 py-3 text-xs">${escapeHtml(event.unit || event.source || '--')}</td>
+            <td class="px-4 py-3 text-xs font-mono">${escapeHtml(event.pid || '--')}</td>
+            <td class="px-4 py-3 text-sm">${escapeHtml(event.message || '')}</td>
+        </tr>
+    `).join('');
+}
+
+function updatePagination(total) {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    setText('pageInfo', `Страница ${currentPage} из ${totalPages} (всего ${total.toLocaleString('ru-RU')})`);
+    document.getElementById('prevPage').disabled = currentPage === 1;
+    document.getElementById('nextPage').disabled = currentPage === totalPages;
 }
 
 function updateSortIndicators() {
-    document.querySelectorAll('.sortable').forEach(header => {
+    document.querySelectorAll('.sortable').forEach((header) => {
         header.classList.remove('asc', 'desc');
         if (header.dataset.sort === currentSort.field) {
             header.classList.add(currentSort.direction);
@@ -367,253 +392,85 @@ function updateSortIndicators() {
     });
 }
 
-function updatePaginationInfo(total) {
-    totalEvents = total;
-    const totalPages = Math.ceil(total / pageSize);
-    
-    document.getElementById('pageInfo').textContent = 
-        `Страница ${currentPage} из ${totalPages} (Всего: ${total.toLocaleString('ru-RU')})`;
-    
-    document.getElementById('prevPage').disabled = currentPage === 1;
-    document.getElementById('nextPage').disabled = currentPage >= totalPages;
-    
-    document.getElementById('table-info').textContent = 
-        `Показано ${Math.min((currentPage - 1) * pageSize + 1, total)}-${Math.min(currentPage * pageSize, total)} из ${total.toLocaleString('ru-RU')}`;
-}
-
-function displayLogs(events) {
-    const tbody = document.getElementById('logsTableBody');
-    tbody.innerHTML = '';
-    
-    if (events.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = '<td colspan="6" class="loading">События не найдены</td>';
-        tbody.appendChild(row);
-        return;
-    }
-    
-    events.forEach((event) => {
-        const row = document.createElement('tr');
-        row.dataset.eventIndex = allEvents.indexOf(event);
-        
-        const formatDate = (dateStr) => {
-            if (!dateStr) return 'Н/Д';
-            try {
-                const date = new Date(dateStr);
-                return date.toLocaleString('ru-RU');
-            } catch {
-                return dateStr;
-            }
-        };
-        
-        const severity = event.severity || 'info';
-        const severityClass = `severity-${severity}`;
-        
-        const severityTranslations = {
-            'emerg': 'Аварийная',
-            'alert': 'Тревога',
-            'crit': 'Критическая',
-            'err': 'Ошибка',
-            'warn': 'Предупреждение',
-            'notice': 'Уведомление',
-            'info': 'Информация',
-            'debug': 'Отладка'
-        };
-        const severityLabel = severityTranslations[severity] || severity;
-        
-        const shortMessage = (event.message || '').substring(0, 100);
-        const shortSuffix = (event.message || '').length > 100 ? '...' : '';
-        row.innerHTML = `
-            <td>${escapeHtml(formatDate(event.ts))}</td>
-            <td><span class="severity-badge ${severityClass}">${escapeHtml(severityLabel)}</span></td>
-            <td>${escapeHtml(event.host || 'Н/Д')}</td>
-            <td>${escapeHtml(event.unit || 'Н/Д')}</td>
-            <td>${escapeHtml(String(event.pid ?? 'Н/Д'))}</td>
-            <td>${escapeHtml(shortMessage)}${shortSuffix}</td>
-        `;
-        
-        tbody.appendChild(row);
-    });
-}
-
 function showEventDetails(eventIndex) {
     const event = allEvents[eventIndex];
     if (!event) return;
-    
     const modal = document.getElementById('eventModal');
-    const body = document.getElementById('modalBody');
-    
-    const severityTranslations = {
-        'emerg': 'Аварийная',
-        'alert': 'Тревога',
-        'crit': 'Критическая',
-        'err': 'Ошибка',
-        'warn': 'Предупреждение',
-        'notice': 'Уведомление',
-        'info': 'Информация',
-        'debug': 'Отладка'
-    };
-    
-    const formatDate = (dateStr) => {
-        if (!dateStr) return 'Н/Д';
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleString('ru-RU');
-        } catch {
-            return dateStr;
-        }
-    };
-    
-    const rawJson = event.raw ? escapeHtml(JSON.stringify(event.raw, null, 2)) : '';
-    body.innerHTML = `
-        <div class="event-detail-item">
-            <div class="event-detail-label">Время</div>
-            <div class="event-detail-value">${escapeHtml(formatDate(event.ts))}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">Уровень важности</div>
-            <div class="event-detail-value">${escapeHtml(severityTranslations[event.severity] || event.severity)}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">Хост</div>
-            <div class="event-detail-value">${escapeHtml(event.host || 'Н/Д')}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">Источник</div>
-            <div class="event-detail-value">${escapeHtml(event.source || 'Н/Д')}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">Служба</div>
-            <div class="event-detail-value">${escapeHtml(event.unit || 'Н/Д')}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">Процесс</div>
-            <div class="event-detail-value">${escapeHtml(event.process || 'Н/Д')}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">PID</div>
-            <div class="event-detail-value">${escapeHtml(String(event.pid ?? 'Н/Д'))}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">UID</div>
-            <div class="event-detail-value">${escapeHtml(String(event.uid ?? 'Н/Д'))}</div>
-        </div>
-        <div class="event-detail-item">
-            <div class="event-detail-label">Сообщение</div>
-            <div class="event-detail-value">${escapeHtml(event.message || 'Н/Д')}</div>
-        </div>
-        ${event.raw ? `
-        <div class="event-detail-item">
-            <div class="event-detail-label">Исходные данные</div>
-            <div class="event-detail-value">
-                <pre>${rawJson}</pre>
-            </div>
-        </div>
-        ` : ''}
+    const modalBody = document.getElementById('modalBody');
+    if (!modal || !modalBody) return;
+    modalBody.innerHTML = `
+        <div><strong>Время:</strong> ${escapeHtml(formatDateTimeRu(event.ts))}</div>
+        <div><strong>Важность:</strong> ${escapeHtml(getSeverityLabel(event.severity))}</div>
+        <div><strong>Хост:</strong> ${escapeHtml(event.host || '--')}</div>
+        <div><strong>Источник:</strong> ${escapeHtml(event.source || '--')}</div>
+        <div><strong>Служба:</strong> ${escapeHtml(event.unit || '--')}</div>
+        <div><strong>PID:</strong> ${escapeHtml(event.pid || '--')}</div>
+        <div><strong>Сообщение:</strong><br>${escapeHtml(event.message || '')}</div>
     `;
-    
-    modal.classList.add('show');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
 }
 
 function closeEventModal() {
-    document.getElementById('eventModal').classList.remove('show');
+    const modal = document.getElementById('eventModal');
+    modal?.classList.add('hidden');
+    modal?.classList.remove('flex');
 }
 
 function showSettings() {
-    document.getElementById('settingsModal').classList.add('show');
+    const modal = document.getElementById('settingsModal');
+    modal?.classList.remove('hidden');
+    modal?.classList.add('flex');
 }
 
 function closeSettingsModal() {
-    document.getElementById('settingsModal').classList.remove('show');
-}
-
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const isDark = document.body.classList.contains('dark-theme');
-    document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-}
-
-function escapeHtml(text) {
-    if (text === null || text === undefined) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
+    const modal = document.getElementById('settingsModal');
+    modal?.classList.add('hidden');
+    modal?.classList.remove('flex');
 }
 
 function updateRefreshInterval() {
-    refreshInterval = parseInt(document.getElementById('refreshInterval').value) * 1000;
+    refreshInterval = Number(document.getElementById('refreshInterval')?.value || 30) * 1000;
     setupAutoRefresh();
 }
 
 function toggleAutoRefresh() {
-    const enabled = document.getElementById('autoRefreshEnabled').checked;
-    if (enabled) {
-        setupAutoRefresh();
-    } else {
-        if (autoRefreshInterval) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshInterval = null;
-        }
+    const enabled = document.getElementById('autoRefreshEnabled')?.checked;
+    if (!enabled) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+        return;
     }
+    setupAutoRefresh();
 }
 
 function setupAutoRefresh() {
-    if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-    }
-    
-    const enabled = document.getElementById('autoRefreshEnabled')?.checked ?? true;
-    if (enabled && refreshInterval > 0) {
-        autoRefreshInterval = setInterval(() => {
-            loadStats();
-            loadLogs();
+    clearInterval(autoRefreshTimer);
+    if (refreshInterval > 0) {
+        autoRefreshTimer = setInterval(async () => {
+            await loadStats();
+            await loadLogs();
         }, refreshInterval);
     }
 }
 
 function exportToCSV() {
+    if (!allEvents.length) return;
     const headers = ['Время', 'Важность', 'Хост', 'Служба', 'PID', 'Сообщение'];
-    const rows = allEvents.map(event => {
-        const formatDate = (dateStr) => {
-            if (!dateStr) return 'Н/Д';
-            try {
-                return new Date(dateStr).toLocaleString('ru-RU');
-            } catch {
-                return dateStr;
-            }
-        };
-        
-        const severityTranslations = {
-            'emerg': 'Аварийная',
-            'alert': 'Тревога',
-            'crit': 'Критическая',
-            'err': 'Ошибка',
-            'warn': 'Предупреждение',
-            'notice': 'Уведомление',
-            'info': 'Информация',
-            'debug': 'Отладка'
-        };
-        
-        return [
-            formatDate(event.ts),
-            severityTranslations[event.severity] || event.severity,
-            event.host || 'Н/Д',
-            event.unit || 'Н/Д',
-            event.pid || 'Н/Д',
-            `"${(event.message || '').replace(/"/g, '""')}"`
-        ];
-    });
-    
-    const csv = [
+    const lines = [
         headers.join(','),
-        ...rows.map(row => row.join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        ...allEvents.map((event) => [
+            formatDateTimeRu(event.ts),
+            getSeverityLabel(event.severity),
+            event.host || '',
+            event.unit || event.source || '',
+            event.pid || '',
+            event.message || '',
+        ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')),
+    ];
+    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `events_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `logs_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
 }
-

@@ -105,7 +105,7 @@ function setupEventListeners() {
 async function loadDashboard() {
     try {
         const [statsRes, eventsRes, incidentsRes, incidentsStatsRes] = await Promise.all([
-            authenticatedFetch(`${API_BASE}/stats`),
+            authenticatedFetch(`${API_BASE}/api/stats`),
             authenticatedFetch(`${API_BASE}/api/logs?limit=1000`),
             authenticatedFetch(`${API_BASE}/api/incidents?limit=20`).catch(() => null),
             authenticatedFetch(`${API_BASE}/api/incidents/stats`).catch(() => null)
@@ -455,3 +455,4 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+

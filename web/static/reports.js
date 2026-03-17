@@ -1,50 +1,71 @@
-const API_BASE = window.location.origin;
+﻿const {
+    checkPageAuth,
+    createAutoRefreshController,
+    escapeHtml,
+    formatDateTimeRu,
+    getSeverityBadgeClass,
+    getSeverityLabel,
+    setupGlobalSearch,
+    setupLogout,
+    persistRecentAction,
+} = window.AppShell;
+const { getIncidents, getLogs, getStats } = window.DataClient;
+
 let reportRows = [];
-let autoRefreshTimer = null;
+let autoRefreshController = null;
+const REPORT_PRESETS = [
+    { label: 'За 24 часа', type: 'reload' },
+    { label: 'За 7 дней', type: 'reload' },
+    { label: 'По критичным', type: 'critical' },
+    { label: 'По хосту', type: 'host' },
+];
 
 document.addEventListener('DOMContentLoaded', async () => {
+    setupLogout('logoutBtn');
+    setupGlobalSearch('reportsSearch', (query) => `/analytics?search=${encodeURIComponent(query)}`);
+    installAnalyticsUx();
     try {
-        await checkAuth();
+        await checkPageAuth({ usernameElementId: 'username', fallbackUsername: 'Аудитор' });
         await loadReportData();
         setupReportActions();
-        setupAutoRefresh();
-    } catch (e) {
-        console.error(e);
+        autoRefreshController = createAutoRefreshController(loadReportData, 30000);
+        autoRefreshController.start();
+    } catch (error) {
+        console.error(error);
     }
 });
 
-async function checkAuth() {
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
-    if (res.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
+function installAnalyticsUx() {
+    const controls = document.querySelector('.flex.gap-3');
+    if (controls && !document.getElementById('analyticsPresetFilters')) {
+        const box = document.createElement('div');
+        box.id = 'analyticsPresetFilters';
+        box.className = 'w-full flex flex-wrap gap-2 mt-3';
+        box.innerHTML = REPORT_PRESETS.map((preset, index) => `<button data-preset-index="${index}" class="px-3 py-1.5 rounded-lg border border-border-dark text-xs font-bold text-text-muted hover:text-white hover:border-primary/50 transition-colors">${preset.label}</button>`).join('') + '<button id="copyReportSummaryBtn" class="px-3 py-1.5 rounded-lg border border-primary/40 text-xs font-bold text-primary hover:bg-primary/10 transition-colors">Скопировать сводку</button>';
+        controls.parentElement.appendChild(box);
     }
 }
 
 async function loadReportData() {
-    const [statsRes, incidentsRes, logsRes] = await Promise.all([
-        fetch(`${API_BASE}/stats`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/incidents?limit=10`, { credentials: 'include' }).catch(() => null),
-        fetch(`${API_BASE}/api/logs?limit=50`, { credentials: 'include' }).catch(() => null),
+    const [stats, incidents, logs] = await Promise.all([
+        getStats(),
+        getIncidents({ limit: 10 }).catch(() => []),
+        getLogs({ limit: 50 }).catch(() => []),
     ]);
-
-    const stats = statsRes.ok ? await statsRes.json() : {};
-    const incidents = incidentsRes?.ok ? await incidentsRes.json() : [];
-    const logs = logsRes?.ok ? await logsRes.json() : [];
-
     updateCriticalTotal(stats);
     updateRiskLevel(stats);
     buildReportRows(incidents, logs);
     applyReportSearch();
+    persistRecentAction({ title: 'Отчеты', url: window.location.href, ts: new Date().toISOString() });
 }
 
 function updateCriticalTotal(stats) {
     const severity = stats.severity || {};
     const criticalCount = (severity.emerg || 0) + (severity.alert || 0) + (severity.crit || 0);
-    const totalEl = document.getElementById('criticalTotal');
-    const trendEl = document.getElementById('criticalTrend');
-    if (totalEl) totalEl.textContent = criticalCount.toLocaleString('ru-RU');
-    if (trendEl) trendEl.innerHTML = '<span class="material-symbols-outlined text-[16px]">trending_up</span> 0%';
+    const totalElement = document.getElementById('criticalTotal');
+    const trendElement = document.getElementById('criticalTrend');
+    if (totalElement) totalElement.textContent = criticalCount.toLocaleString('ru-RU');
+    if (trendElement) trendElement.innerHTML = '<span class="material-symbols-outlined text-[16px]">schedule</span> обновлено только что';
 }
 
 function updateRiskLevel(stats) {
@@ -52,133 +73,97 @@ function updateRiskLevel(stats) {
     const total = stats.total_events || 1;
     const criticalCount = (severity.emerg || 0) + (severity.alert || 0) + (severity.crit || 0);
     const ratio = criticalCount / total;
-
-    let level = 'НИЗКИЙ';
-    let hint = 'Нормальная зона';
+    let level = 'Низкий';
+    let hint = 'Система в норме';
     if (ratio > 0.2) {
-        level = 'ВЫСОКИЙ';
-        hint = 'Критическая зона';
+        level = 'Критично';
+        hint = 'Нужно расследование';
     } else if (ratio > 0.05) {
-        level = 'СРЕДНИЙ';
-        hint = 'Зона внимания';
+        level = 'Требует внимания';
+        hint = 'Есть события повышенного риска';
     }
-
-    const levelEl = document.getElementById('riskLevel');
-    const hintEl = document.getElementById('riskHint');
-    if (levelEl) levelEl.textContent = level;
-    if (hintEl) hintEl.innerHTML = `<span class="material-symbols-outlined text-[16px]">warning</span> ${hint}`;
+    const levelElement = document.getElementById('riskLevel');
+    const hintElement = document.getElementById('riskHint');
+    if (levelElement) levelElement.textContent = level;
+    if (hintElement) hintElement.innerHTML = `<span class="material-symbols-outlined text-[16px]">insights</span> ${hint}`;
 }
 
 function buildReportRows(incidents, logs) {
-    const tbody = document.getElementById('reportTableBody');
-    if (!tbody) return;
-
-    reportRows = [];
-    if (Array.isArray(incidents) && incidents.length) {
-        reportRows = incidents.map(inc => {
-            const status = (inc.status || 'open').toLowerCase();
-            const statusLabel = status === 'open' ? 'Активно' : status === 'investigating' ? 'Расследуется' : 'Закрыто';
-            const statusDot = status === 'open' ? 'bg-red-500' : status === 'investigating' ? 'bg-yellow-500' : 'bg-emerald-500';
-            const time = inc.detected_at ? new Date(inc.detected_at).toLocaleString('ru-RU') : '--';
-            const type = inc.incident_type || 'Событие';
-            const source = inc.host || '--';
-            const sev = (inc.severity || 'info').toLowerCase();
-            const sevLabel = sev === 'critical' ? 'КРИТИЧЕСКИЙ' : sev === 'high' ? 'ВЫСОКИЙ' : sev === 'medium' ? 'СРЕДНИЙ' : 'НИЗКИЙ';
-            const sevClass = sev === 'critical' ? 'text-red-400 bg-red-900/30' : sev === 'high' ? 'text-orange-400 bg-orange-900/30' : sev === 'medium' ? 'text-yellow-400 bg-yellow-900/30' : 'text-emerald-400 bg-emerald-900/30';
-            return {
-                statusLabel,
-                statusDot,
-                time,
-                type,
-                source,
-                sevLabel,
-                sevClass,
-                link: `/incidents/details?id=INC-${inc.id}`
-            };
-        });
-    } else if (Array.isArray(logs) && logs.length) {
-        reportRows = logs.slice(0, 8).map(ev => {
-            const time = ev.ts ? new Date(ev.ts).toLocaleString('ru-RU') : '--';
-            const type = ev.unit || ev.source || 'Событие';
-            const source = ev.host || '--';
-            const sev = (ev.severity || 'info').toLowerCase();
-            const sevLabel = sev === 'emerg' || sev === 'alert' || sev === 'crit' ? 'КРИТИЧЕСКИЙ' : sev === 'err' ? 'ВЫСОКИЙ' : sev === 'warn' ? 'СРЕДНИЙ' : 'НИЗКИЙ';
-            const sevClass = sevLabel === 'КРИТИЧЕСКИЙ' ? 'text-red-400 bg-red-900/30' : sevLabel === 'ВЫСОКИЙ' ? 'text-orange-400 bg-orange-900/30' : sevLabel === 'СРЕДНИЙ' ? 'text-yellow-400 bg-yellow-900/30' : 'text-emerald-400 bg-emerald-900/30';
-            return {
-                statusLabel: 'Обработано',
-                statusDot: 'bg-emerald-500',
-                time,
-                type,
-                source,
-                sevLabel,
-                sevClass,
-                link: '/logs'
-            };
-        });
-    }
+    reportRows = (incidents?.length ? incidents.map((incident) => ({
+        statusLabel: window.AppShell.getStatusMeta(incident.status).label,
+        statusDot: window.AppShell.getStatusMeta(incident.status).tone === 'danger' ? 'bg-red-500' : window.AppShell.getStatusMeta(incident.status).tone === 'warning' ? 'bg-yellow-500' : 'bg-emerald-500',
+        time: formatDateTimeRu(incident.detected_at),
+        type: incident.incident_type || 'Событие',
+        source: incident.host || '--',
+        severityLabel: getSeverityLabel(incident.severity),
+        severityClass: getSeverityBadgeClass(incident.severity),
+        link: `/incidents/details?id=INC-${incident.id}`,
+    })) : logs.slice(0, 8).map((event) => ({
+        statusLabel: 'Обработано',
+        statusDot: 'bg-emerald-500',
+        time: formatDateTimeRu(event.ts),
+        type: event.unit || event.source || 'Событие',
+        source: event.host || '--',
+        severityLabel: getSeverityLabel(event.severity),
+        severityClass: getSeverityBadgeClass(event.severity),
+        link: '/logs',
+    })));
 }
 
 function applyReportSearch() {
     const query = (document.getElementById('reportsSearch')?.value || '').trim().toLowerCase();
-    const filtered = query
-        ? reportRows.filter(row => `${row.statusLabel} ${row.time} ${row.type} ${row.source} ${row.sevLabel}`.toLowerCase().includes(query))
-        : reportRows;
+    const filtered = query ? reportRows.filter((row) => `${row.statusLabel} ${row.type} ${row.source} ${row.severityLabel}`.toLowerCase().includes(query)) : reportRows;
     renderReportRows(filtered);
 }
 
 function renderReportRows(rows) {
     const tbody = document.getElementById('reportTableBody');
     if (!tbody) return;
-    if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-6 text-text-muted text-sm">Нет данных для отображения.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = rows.map(row => `
+    tbody.innerHTML = rows.length ? rows.map((row) => `
         <tr class="hover:bg-border-dark/30 transition-colors">
             <td class="px-6 py-4"><span class="flex items-center gap-2"><span class="size-2 ${row.statusDot} rounded-full"></span> ${escapeHtml(row.statusLabel)}</span></td>
             <td class="px-6 py-4 font-mono text-xs">${escapeHtml(row.time)}</td>
             <td class="px-6 py-4 font-medium">${escapeHtml(row.type)}</td>
             <td class="px-6 py-4 font-mono text-xs">${escapeHtml(row.source)}</td>
-            <td class="px-6 py-4"><span class="px-2 py-1 ${row.sevClass} rounded text-[10px] font-bold">${escapeHtml(row.sevLabel)}</span></td>
+            <td class="px-6 py-4"><span class="px-2 py-1 ${row.severityClass} rounded text-[10px] font-bold">${escapeHtml(row.severityLabel)}</span></td>
             <td class="px-6 py-4 text-right"><a href="${row.link}" class="material-symbols-outlined text-text-muted hover:text-white">open_in_new</a></td>
         </tr>
-    `).join('');
+    `).join('') : '<tr><td colspan="6" class="px-6 py-6 text-text-muted text-sm">Нет данных для отображения.</td></tr>';
 }
 
 function setupReportActions() {
     document.getElementById('reportsSearch')?.addEventListener('input', applyReportSearch);
     document.getElementById('previewReportBtn')?.addEventListener('click', loadReportData);
     document.getElementById('generateReportBtn')?.addEventListener('click', exportReportCsv);
+    document.getElementById('analyticsPresetFilters')?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-preset-index]');
+        if (!button) return;
+        const preset = REPORT_PRESETS[Number(button.dataset.presetIndex)];
+        if (preset.type === 'critical') {
+            document.getElementById('reportsSearch').value = 'Критично';
+            applyReportSearch();
+        } else {
+            loadReportData();
+        }
+    });
+    document.getElementById('copyReportSummaryBtn')?.addEventListener('click', async () => {
+        const summary = `Критичные события: ${document.getElementById('criticalTotal')?.textContent || '0'}\nРиск: ${document.getElementById('riskLevel')?.textContent || 'Н/Д'}\nПодсказка: ${document.getElementById('riskHint')?.textContent || ''}`;
+        await navigator.clipboard.writeText(summary);
+        const btn = document.getElementById('copyReportSummaryBtn');
+        if (btn) {
+            btn.textContent = 'Сводка скопирована';
+            setTimeout(() => { btn.textContent = 'Скопировать сводку'; }, 1500);
+        }
+    });
 }
 
 function exportReportCsv() {
     if (!reportRows.length) return;
     const header = ['Статус', 'Время', 'Тип события', 'Источник', 'Важность'];
-    const lines = [
-        header.join(','),
-        ...reportRows.map(row => [
-            row.statusLabel,
-            row.time,
-            row.type,
-            row.source,
-            row.sevLabel
-        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-    ];
+    const lines = [header.join(','), ...reportRows.map((row) => [row.statusLabel, row.time, row.type, row.source, row.severityLabel].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))];
     const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `report_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-}
-
-function setupAutoRefresh() {
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-    autoRefreshTimer = setInterval(loadReportData, 30000);
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }

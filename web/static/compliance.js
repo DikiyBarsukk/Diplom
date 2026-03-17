@@ -1,56 +1,74 @@
-const API_BASE = window.location.origin;
+﻿const {
+    apiBase: API_BASE,
+    authenticatedFetch,
+    checkPageAuth,
+    escapeHtml,
+    getSeverityLabel,
+    getSeverityBadgeClass,
+    setText,
+    setupLogout,
+    setupGlobalSearch,
+    buildLogsUrl,
+    persistRecentAction,
+} = window.AppShell;
+const { getAgentStats, getLogs, getStats } = window.DataClient;
+
 const PERIODS = [
-    { days: 1, label: 'Последние 24 часа' },
-    { days: 7, label: 'Последние 7 дней' },
-    { days: 30, label: 'Последние 30 дней' },
-    { days: 90, label: 'Последние 90 дней' }
+    { days: 1, label: 'За 24 часа' },
+    { days: 7, label: 'За 7 дней' },
+    { days: 30, label: 'За 30 дней' },
+    { days: 90, label: 'За 90 дней' },
 ];
 let allRows = [];
 let selectedHost = 'all';
-let periodIndex = 2;
+let periodIndex = 1;
 let autoRefreshTimer = null;
+const REPORT_PRESETS = [
+    { label: 'За 24 часа', days: 1 },
+    { label: 'За 7 дней', days: 7 },
+    { label: 'Критичные', search: 'crit' },
+    { label: 'По хосту', hostFromSelect: true },
+];
 
 document.addEventListener('DOMContentLoaded', async () => {
+    setupGlobalSearch('complianceSearch', (query) => buildLogsUrl({ search: query }));
+    installComplianceUx();
     try {
-        await checkAuth();
-        updatePeriodButton();
+        await checkPageAuth({ usernameElementId: 'username', fallbackUsername: 'Аудитор' });
         await loadComplianceData();
         setupActions();
         setupAutoRefresh();
-    } catch (e) {
-        console.error(e);
+    } catch (error) {
+        console.error(error);
     }
 });
 
-async function checkAuth() {
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
-    if (res.status === 401) {
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
+function installComplianceUx() {
+    const header = document.querySelector('.flex.flex-wrap.justify-between.items-center.gap-3.px-8.py-8');
+    if (header && !document.getElementById('reportPresetFilters')) {
+        const box = document.createElement('div');
+        box.id = 'reportPresetFilters';
+        box.className = 'w-full flex flex-wrap gap-2';
+        box.innerHTML = REPORT_PRESETS.map((preset, index) => `<button data-preset-index="${index}" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-border-dark text-white hover:bg-slate-700 transition-colors">${preset.label}</button>`).join('') + '<button id="copyComplianceSummaryBtn" class="px-3 py-1.5 text-xs font-bold rounded-lg border border-primary/40 text-primary hover:bg-primary/10 transition-colors">Скопировать сводку</button>';
+        header.appendChild(box);
     }
 }
 
 async function loadComplianceData() {
     const periodDays = PERIODS[periodIndex].days;
-    const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString();
-    const hostParam = selectedHost !== 'all' ? `&host=${encodeURIComponent(selectedHost)}` : '';
-    const logsUrl = `${API_BASE}/api/logs?limit=200&since=${encodeURIComponent(since)}${hostParam}`;
-    const [statsRes, logsRes, agentsRes] = await Promise.all([
-        fetch(`${API_BASE}/stats`, { credentials: 'include' }),
-        fetch(logsUrl, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/agents/stats?window_minutes=5`, { credentials: 'include' })
-    ]);
-
-    const stats = statsRes.ok ? await statsRes.json() : {};
-    const logs = logsRes.ok ? await logsRes.json() : [];
-    const agents = agentsRes.ok ? await agentsRes.json() : null;
-
+    const since = new Date(Date.now() - periodDays * 86400000).toISOString();
+    const logs = await getLogs({ limit: 200, since, host: selectedHost !== 'all' ? selectedHost : null }).catch(() => []);
+    const stats = await getStats().catch(() => ({}));
+    const agents = await getAgentStats(5).catch(() => null);
     updateSummary(stats);
     updateAgentSummary(agents);
     buildAssets(agents, stats);
     buildRows(logs);
     updateTopUsers(logs);
-    applySearch();
+    renderRows(getFilteredRows());
+    setText('systemsOnline', agents?.online ?? 0);
+    setText('systemsTotal', agents?.total ?? 0);
+    persistRecentAction({ title: 'Compliance', url: window.location.href, ts: new Date().toISOString() });
 }
 
 function updateSummary(stats) {
@@ -58,8 +76,7 @@ function updateSummary(stats) {
     const activeSessions = (severity.info || 0) + (severity.notice || 0);
     const policyViolations = (severity.err || 0) + (severity.alert || 0);
     const privEsc = severity.crit || 0;
-    const score = Math.max(0, 100 - Math.min(100, policyViolations));
-
+    const score = Math.max(0, 100 - Math.min(100, policyViolations * 3));
     setText('activeSessions', activeSessions);
     setText('policyViolations', policyViolations);
     setText('privEscalations', privEsc);
@@ -79,96 +96,52 @@ function updateAgentSummary(agents) {
 function buildAssets(agents, stats) {
     const select = document.getElementById('assetSelect');
     if (!select) return;
-    const lastSeen = agents?.last_seen || {};
-    const hostsStats = stats?.hosts || {};
-    const hosts = Array.from(new Set([...Object.keys(lastSeen), ...Object.keys(hostsStats)])).sort();
-    select.innerHTML = '';
-    const allOption = document.createElement('option');
-    allOption.value = 'all';
-    allOption.textContent = 'Все удаленные ПК';
-    select.appendChild(allOption);
-    hosts.forEach(host => {
-        const count = hostsStats[host] || 0;
-        const label = count ? `${host} (${count} событий)` : host;
-        const option = document.createElement('option');
-        option.value = host;
-        option.textContent = label;
-        select.appendChild(option);
-    });
-    select.value = selectedHost;
-    if (select.value !== selectedHost) {
-        selectedHost = 'all';
-        select.value = 'all';
-    }
+    const current = select.value || selectedHost;
+    const hosts = Array.from(new Set([...(Object.keys(agents?.last_seen || {})), ...(Object.keys(stats?.hosts || {}))])).sort();
+    select.innerHTML = '<option value="all">Все удаленные ПК</option>' + hosts.map((host) => `<option value="${escapeHtml(host)}">${escapeHtml(host)}</option>`).join('');
+    select.value = hosts.includes(current) ? current : 'all';
+    selectedHost = select.value;
 }
 
 function buildRows(logs) {
-    if (!Array.isArray(logs) || !logs.length) {
-        allRows = [];
-        return;
-    }
-    allRows = logs.slice(0, 25).map(ev => {
-        const user = ev.user || ev.username || ev.uid || ev.account || '—';
-        const userRole = ev.role || ev.user_role || (user !== '—' ? 'Пользователь' : 'Система');
-        const eventType = ev.event_type || (ev.message ? ev.message.split('|')[0].trim() : 'Событие');
-        const host = ev.host || '—';
-        const time = ev.ts ? new Date(ev.ts).toLocaleString('ru-RU') : '--';
-        const sev = (ev.severity || 'info').toLowerCase();
-        const risk = sev === 'emerg' || sev === 'alert' || sev === 'crit' ? 'КРИТИЧЕСКИЙ' :
-            sev === 'err' ? 'ВЫСОКИЙ' : sev === 'warn' ? 'СРЕДНИЙ' : 'НИЗКИЙ';
-        const riskClass = risk === 'КРИТИЧЕСКИЙ' ? 'bg-red-900/30 text-red-400' :
-            risk === 'ВЫСОКИЙ' ? 'bg-orange-900/30 text-orange-400' :
-            risk === 'СРЕДНИЙ' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-emerald-900/30 text-emerald-400';
-        return {
-            user,
-            userRole,
-            eventType,
-            host,
-            time,
-            risk,
-            riskClass
-        };
-    });
-}
-
-function applySearch() {
-    const filtered = getFilteredRows();
-    renderRows(filtered);
+    allRows = (logs || []).slice(0, 50).map((event) => ({
+        user: event.user || event.username || event.uid || event.account || '—',
+        userRole: event.role || event.user_role || 'Пользователь',
+        eventType: event.event_type || event.unit || event.source || 'Событие',
+        host: event.host || '—',
+        time: window.AppShell.formatDateTimeRu(event.ts),
+        riskLabel: getSeverityLabel(event.severity),
+        riskClass: getSeverityBadgeClass(event.severity),
+        raw: event,
+    }));
 }
 
 function getFilteredRows() {
     const query = (document.getElementById('complianceSearch')?.value || '').trim().toLowerCase();
-    return query
-        ? allRows.filter(r => `${r.user} ${r.eventType} ${r.host} ${r.risk}`.toLowerCase().includes(query))
-        : allRows;
+    return query ? allRows.filter((row) => `${row.user} ${row.eventType} ${row.host} ${row.riskLabel}`.toLowerCase().includes(query)) : allRows;
 }
 
 function renderRows(rows) {
     const tbody = document.getElementById('complianceTableBody');
     if (!tbody) return;
     if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-6 text-text-muted text-sm">Нет данных для отображения.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-6 text-text-muted text-sm">Данные по выбранному периоду не найдены.</td></tr>';
         return;
     }
-    tbody.innerHTML = rows.map(r => `
+    tbody.innerHTML = rows.map((row) => `
         <tr class="hover:bg-border-dark/30 transition-colors">
-            <td class="px-6 py-4">
-                <div class="flex flex-col">
-                    <span class="font-bold text-white">${escapeHtml(String(r.user))}</span>
-                    <span class="text-[10px] text-text-muted">${escapeHtml(r.userRole)}</span>
-                </div>
-            </td>
-            <td class="px-6 py-4 font-medium">${escapeHtml(r.eventType)}</td>
-            <td class="px-6 py-4 font-mono text-xs">${escapeHtml(r.host)}</td>
-            <td class="px-6 py-4 font-mono text-xs">${escapeHtml(r.time)}</td>
-            <td class="px-6 py-4"><span class="px-2 py-1 ${r.riskClass} rounded text-[10px] font-bold">${r.risk}</span></td>
-            <td class="px-6 py-4 text-right"><button class="material-symbols-outlined text-text-muted hover:text-white">description</button></td>
+            <td class="px-6 py-4"><div class="flex flex-col"><span class="font-bold text-white">${escapeHtml(String(row.user))}</span><span class="text-[10px] text-text-muted">${escapeHtml(row.userRole)}</span></div></td>
+            <td class="px-6 py-4 font-medium">${escapeHtml(row.eventType)}</td>
+            <td class="px-6 py-4 font-mono text-xs">${escapeHtml(row.host)}</td>
+            <td class="px-6 py-4 font-mono text-xs">${escapeHtml(row.time)}</td>
+            <td class="px-6 py-4"><span class="px-2 py-1 ${row.riskClass} rounded text-[10px] font-bold">${escapeHtml(row.riskLabel)}</span></td>
+            <td class="px-6 py-4 text-right"><a href="${buildLogsUrl({ host: row.host !== '—' ? row.host : '', search: row.eventType })}" class="material-symbols-outlined text-text-muted hover:text-white">open_in_new</a></td>
         </tr>
     `).join('');
 }
 
 function setupActions() {
-    document.getElementById('complianceSearch')?.addEventListener('input', applySearch);
+    document.getElementById('complianceSearch')?.addEventListener('input', () => renderRows(getFilteredRows()));
     document.getElementById('generateComplianceBtn')?.addEventListener('click', loadComplianceData);
     document.getElementById('analyzeLogsBtn')?.addEventListener('click', loadComplianceData);
     document.getElementById('periodButton')?.addEventListener('click', () => {
@@ -176,39 +149,60 @@ function setupActions() {
         updatePeriodButton();
         loadComplianceData();
     });
-    document.getElementById('assetSelect')?.addEventListener('change', (e) => {
-        selectedHost = e.target.value || 'all';
+    document.getElementById('assetSelect')?.addEventListener('change', (event) => {
+        selectedHost = event.target.value || 'all';
         loadComplianceData();
     });
     document.getElementById('selectAllAssetsBtn')?.addEventListener('click', () => {
         selectedHost = 'all';
-        const select = document.getElementById('assetSelect');
-        if (select) select.value = 'all';
+        document.getElementById('assetSelect').value = 'all';
         loadComplianceData();
     });
     document.getElementById('resetAssetsBtn')?.addEventListener('click', () => {
         selectedHost = 'all';
-        const select = document.getElementById('assetSelect');
-        if (select) select.value = 'all';
+        document.getElementById('assetSelect').value = 'all';
+        document.getElementById('complianceSearch').value = '';
         loadComplianceData();
     });
     document.getElementById('exportComplianceBtn')?.addEventListener('click', exportCsv);
+    document.getElementById('reportPresetFilters')?.addEventListener('click', (event) => {
+        const presetButton = event.target.closest('[data-preset-index]');
+        if (!presetButton) return;
+        const preset = REPORT_PRESETS[Number(presetButton.dataset.presetIndex)];
+        if (preset.days) {
+            periodIndex = PERIODS.findIndex((item) => item.days === preset.days);
+            if (periodIndex < 0) periodIndex = 1;
+            updatePeriodButton();
+            loadComplianceData();
+        } else if (preset.hostFromSelect) {
+            renderRows(getFilteredRows().filter((row) => selectedHost === 'all' ? true : row.host === selectedHost));
+        } else if (preset.search) {
+            document.getElementById('complianceSearch').value = preset.search;
+            renderRows(getFilteredRows());
+        }
+    });
+    document.getElementById('copyComplianceSummaryBtn')?.addEventListener('click', async () => {
+        const summary = [
+            `Активные сессии: ${document.getElementById('activeSessions')?.textContent || '0'}`,
+            `Нарушения политик: ${document.getElementById('policyViolations')?.textContent || '0'}`,
+            `Повышение привилегий: ${document.getElementById('privEscalations')?.textContent || '0'}`,
+            `Оценка аудита: ${document.getElementById('auditScore')?.textContent || '0/100'}`,
+        ].join('\n');
+        await navigator.clipboard.writeText(summary);
+        const btn = document.getElementById('copyComplianceSummaryBtn');
+        if (btn) {
+            btn.textContent = 'Сводка скопирована';
+            setTimeout(() => { btn.textContent = 'Скопировать сводку'; }, 1500);
+        }
+    });
 }
 
 function exportCsv() {
-    const rows = getFilteredRows();
-    if (!rows.length) return;
+    if (!allRows.length) return;
     const header = ['Пользователь', 'Роль', 'Тип события', 'Хост', 'Время', 'Риск'];
     const lines = [
         header.join(','),
-        ...rows.map(r => [
-            r.user,
-            r.userRole,
-            r.eventType,
-            r.host,
-            r.time,
-            r.risk
-        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        ...getFilteredRows().map((row) => [row.user, row.userRole, row.eventType, row.host, row.time, row.riskLabel].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')),
     ];
     const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -217,55 +211,25 @@ function exportCsv() {
     link.click();
 }
 
-function setupAutoRefresh() {
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-    autoRefreshTimer = setInterval(loadComplianceData, 30000);
-}
-
-function setText(id, value) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-}
-
 function updatePeriodButton() {
-    const button = document.getElementById('periodButton');
-    if (!button) return;
-    const label = PERIODS[periodIndex]?.label || 'Последние 30 дней';
-    const span = button.querySelector('span:last-child');
-    if (span) span.textContent = label;
+    const span = document.querySelector('#periodButton span:last-child');
+    if (span) span.textContent = PERIODS[periodIndex].label;
 }
 
 function updateTopUsers(logs) {
     const container = document.getElementById('topUsersList');
     if (!container) return;
-    if (!Array.isArray(logs) || !logs.length) {
-        container.innerHTML = '<p class="text-text-muted text-sm">Нет данных для отображения.</p>';
-        return;
-    }
     const counts = new Map();
-    logs.forEach(ev => {
-        const user = ev.user || ev.username || ev.uid || ev.account || '';
+    (logs || []).forEach((event) => {
+        const user = event.user || event.username || event.uid || event.account;
         if (!user) return;
         counts.set(user, (counts.get(user) || 0) + 1);
     });
-    const top = Array.from(counts.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-    if (!top.length) {
-        container.innerHTML = '<p class="text-text-muted text-sm">Нет данных для отображения.</p>';
-        return;
-    }
-    container.innerHTML = top.map(([user, count]) => `
-        <div class="flex items-center justify-between">
-            <span>${escapeHtml(user)}</span>
-            <span class="text-text-muted text-xs">${count} событий</span>
-        </div>
-    `).join('');
+    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    container.innerHTML = top.length ? top.map(([user, count]) => `<div class="flex items-center justify-between"><span>${escapeHtml(user)}</span><span class="text-text-muted">${count}</span></div>`).join('') : '<p class="text-text-muted text-sm">Нет данных для отображения.</p>';
 }
 
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+function setupAutoRefresh() {
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = setInterval(loadComplianceData, 30000);
 }

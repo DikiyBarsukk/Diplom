@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html class="dark" lang="ru">
 <head>
     <meta charset="utf-8"/>
@@ -53,7 +53,7 @@
         </div>
         <nav class="flex items-center gap-6">
             <a class="text-[#92b7c9] hover:text-white text-sm font-medium leading-normal" href="/">Дашборд</a>
-            <a class="text-white border-b-2 border-primary pb-1 text-sm font-medium leading-normal" href="/incidents">Инциденты</a>
+            <a class="text-white border-b-2 border-primary pb-1 text-sm font-medium leading-normal" href="/incidents">?????????</a>
             <a class="text-[#92b7c9] hover:text-white text-sm font-medium leading-normal" href="/logs">Журналы</a>
             <a class="text-[#92b7c9] hover:text-white text-sm font-medium leading-normal" href="/analytics">Отчеты</a>
         </nav>
@@ -80,7 +80,7 @@
 <main class="flex flex-col h-[calc(100vh-60px)]">
     <div class="px-6 py-4 flex flex-col gap-2">
         <div class="flex flex-wrap gap-2 items-center">
-            <a class="text-[#92b7c9] text-xs font-medium" href="#">Аудит ИБ</a>
+            <a class="text-[#92b7c9] text-xs font-medium" href="#">????? ??</a>
             <span class="text-[#92b7c9] text-xs">/</span>
             <a class="text-[#92b7c9] text-xs font-medium" href="/incidents">Все инциденты</a>
             <span class="text-[#92b7c9] text-xs">/</span>
@@ -89,7 +89,7 @@
         <div class="flex justify-between items-start">
             <div>
                 <h1 class="text-2xl font-black leading-tight tracking-tight flex items-center gap-3">
-                    Инцидент #<span id="incidentTitleId">INC-0000</span>
+                    ???????? #<span id="incidentTitleId">INC-0000</span>
                     <span class="bg-red-500/20 text-red-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-red-500/30" id="incidentSeverity">Критический</span>
                     <span class="bg-primary/20 text-primary text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-primary/30" id="incidentStatus">Расследуется</span>
                 </h1>
@@ -137,12 +137,12 @@
                     <div>
                         <p class="text-[#92b7c9] text-[10px]">Основной хост</p>
                         <p class="text-sm font-mono text-white" id="incidentHost">--</p>
-                    </div>
                     <div>
-                        <p class="text-[#92b7c9] text-[10px]">ОС</p>
+                        <p class="text-[#92b7c9] text-[10px]">??</p>
                         <div class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-xs">grid_view</span>
-                            <p class="text-sm" id="incidentOs">—</p>
+                            <p class="text-sm" id="incidentOs">?</p>
+                        </div>
                         </div>
                     </div>
                     <div>
@@ -178,7 +178,7 @@
                 <h3 class="text-xs font-bold uppercase text-primary mb-4">Действия аудитора</h3>
                 <div class="flex flex-col gap-3">
                     <button class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors">
-                        <span class="material-symbols-outlined text-lg">desktop_access_disabled</span> Изолировать хост
+                        <span class="material-symbols-outlined text-lg">desktop_access_disabled</span> ??????????? ????
                     </button>
                     <button class="w-full bg-[#233c48] hover:bg-[#2d4d5c] text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm">
                         <span class="material-symbols-outlined text-lg">lock_reset</span> Сбросить пароль
@@ -193,7 +193,7 @@
             </div>
             <div class="bg-[#1a2b34] border border-[#233c48] rounded-lg overflow-hidden flex flex-col">
                 <div class="p-4 flex justify-between items-center border-b border-[#233c48]">
-                    <h3 class="text-xs font-bold uppercase text-primary">Источник активности</h3>
+                    <h3 class="text-xs font-bold uppercase text-primary">???????? ??????????</h3>
                     <span class="text-[10px] text-red-400 font-bold uppercase">Внешний источник</span>
                 </div>
                 <div class="h-40 bg-[#111c22] relative group">
@@ -216,6 +216,13 @@
         </div>
     </div>
 </main>
+<script src="/static/auth-client.js"></script>
+<script src="/static/app-shell.js"></script>
+<script src="/static/data-client.js"></script>
 <script src="/static/incident-details.js"></script>
 </body>
 </html>
+
+
+
+

@@ -341,8 +341,8 @@ async function loadDashboard() {
         }
         
         // Load stats
-        console.log('Fetching stats from:', `${API_BASE}/stats`);
-        const statsResponse = await authenticatedFetch(`${API_BASE}/stats`);
+        console.log('Fetching stats from:', `${API_BASE}/api/stats`);
+        const statsResponse = await authenticatedFetch(`${API_BASE}/api/stats`);
         if (!statsResponse.ok) {
             const errorText = await statsResponse.text();
             console.error('Stats response error:', statsResponse.status, errorText);
@@ -1505,4 +1505,5 @@ function filterBySeverityLevel(level) {
         }
     }
 }
+
 
