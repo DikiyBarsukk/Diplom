@@ -1,3 +1,4 @@
+// LEGACY ARCHIVE: historical frontend file, not part of the active UI runtime or deploy packs.
 // API Base URL
 const API_BASE = window.location.origin;
 

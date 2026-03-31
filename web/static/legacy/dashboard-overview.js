@@ -1,3 +1,4 @@
+// LEGACY ARCHIVE: historical frontend file, not part of the active UI runtime or deploy packs.
 /**
  * Security Overview Dashboard - BARSUKSIEM
  * Integrates with existing API: /stats, /api/logs, /api/incidents, /api/incidents/stats
