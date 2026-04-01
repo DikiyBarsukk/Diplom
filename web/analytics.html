@@ -9,25 +9,93 @@
 <body>
 <div class="page-shell">
     <aside class="sidebar">
-        <div class="brand-box"><div class="brand-mark">BS</div><div class="brand-copy"><h1>BARSUKSIEM</h1><p>Отчёты и аналитика</p></div></div>
+        <div class="brand-box">
+            <div class="brand-mark">BS</div>
+            <div class="brand-copy">
+                <h1>BARSUKSIEM</h1>
+                <p>Отчёты и аналитическая сводка</p>
+            </div>
+        </div>
+
         <nav class="nav-list">
             <a class="nav-link" href="/"><div class="nav-label"><strong>Панель SOC</strong><span>Оперативная сводка</span></div></a>
             <a class="nav-link" href="/incidents"><div class="nav-label"><strong>Инциденты</strong><span>Триаж и расследование</span></div></a>
             <a class="nav-link" href="/logs"><div class="nav-label"><strong>Журналы</strong><span>Поиск и фильтрация</span></div></a>
             <a class="nav-link is-active" href="/analytics"><div class="nav-label"><strong>Аналитика</strong><span>Сводки и экспорт</span></div></a>
-            <a class="nav-link" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Соответствие</span></div></a>
+            <a class="nav-link" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Соответствие и пользователи</span></div></a>
         </nav>
-        <div class="sidebar-card"><h3>Быстрые пресеты</h3><div id="analyticsPresetFilters" class="pill-row"></div></div>
-        <div class="sidebar-card"><h3>Подсказка</h3><p>Используйте поиск и пресеты, чтобы сразу перейти к критичным событиям или отчёту по конкретному хосту.</p></div>
+
+        <div class="sidebar-card">
+            <h3>Быстрые пресеты</h3>
+            <div id="analyticsPresetFilters" class="pill-row"></div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3>Подсказка</h3>
+            <p>Используйте эту страницу как экран для демонстрации результатов комиссии: здесь собрана короткая сводка по риску, критичным событиям и последним детектам.</p>
+        </div>
     </aside>
+
     <main class="main-pane">
         <header class="topbar">
-            <div class="topbar-title"><h2>Отчёты и аналитика</h2><p>Плоская рабочая поверхность для выгрузок, сводок и быстрой демонстрации результатов комиссии.</p></div>
-            <div class="topbar-actions"><input id="reportsSearch" class="search-input" type="search" placeholder="Поиск по источнику, типу события или хосту"><button id="previewReportBtn" class="btn btn-secondary">Обновить</button><button id="generateReportBtn" class="btn btn-primary">Экспорт CSV</button><button id="copyReportSummaryBtn" class="btn btn-ghost">Скопировать сводку</button><div class="user-chip"><span id="username">Аудитор</span><button id="logoutBtn" class="btn-link">Выход</button></div></div>
+            <div class="topbar-title">
+                <h2>Отчёты и аналитика</h2>
+                <p>Плоская рабочая поверхность для выгрузок, кратких аналитических сводок и демонстрации текущего состояния системы без лишних переходов между экранами.</p>
+            </div>
+            <div class="topbar-actions">
+                <input id="reportsSearch" class="search-input" type="search" placeholder="Поиск по источнику, типу события или хосту">
+                <button id="previewReportBtn" class="btn btn-secondary">Обновить</button>
+                <button id="generateReportBtn" class="btn btn-primary">Экспорт CSV</button>
+                <button id="copyReportSummaryBtn" class="btn btn-ghost">Скопировать сводку</button>
+                <div class="user-chip">
+                    <span id="username">Аудитор</span>
+                    <button id="logoutBtn" class="btn-link">Выход</button>
+                </div>
+            </div>
         </header>
+
         <div class="page-grid">
-            <section class="card-grid"><article class="stat-card"><h3>Критичные события</h3><div id="criticalTotal" class="kpi-value">0</div><p id="criticalTrend" class="kpi-subtitle">обновление ожидается</p></article><article class="stat-card"><h3>Уровень риска</h3><div id="riskLevel" class="kpi-value">Низкий</div><p id="riskHint" class="kpi-subtitle">Система в норме</p></article><article class="stat-card"><h3>Свежесть отчёта</h3><div id="lastUpdated" class="kpi-value" style="font-size:1.25rem;">--</div><p class="kpi-subtitle">Показатель обновляется автоматически каждые 30 секунд.</p></article></section>
-            <section class="table-panel"><div class="panel-header"><div><h3>Сводная таблица</h3><p>Показывает последние инциденты и важные события, подходящие для демонстрации или выгрузки в отчёт.</p></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Статус</th><th>Время</th><th>Тип события</th><th>Источник</th><th>Важность</th><th>Действие</th></tr></thead><tbody id="reportTableBody"><tr><td colspan="6" class="table-empty">Ждём данные для отчёта.</td></tr></tbody></table></div></section>
+            <section class="card-grid">
+                <article class="stat-card">
+                    <h3>Критичные события</h3>
+                    <div id="criticalTotal" class="kpi-value">0</div>
+                    <p id="criticalTrend" class="kpi-subtitle">обновление ожидается</p>
+                </article>
+                <article class="stat-card">
+                    <h3>Уровень риска</h3>
+                    <div id="riskLevel" class="kpi-value">Низкий</div>
+                    <p id="riskHint" class="kpi-subtitle">Система в норме</p>
+                </article>
+                <article class="stat-card">
+                    <h3>Свежесть отчёта</h3>
+                    <div id="lastUpdated" class="kpi-value" style="font-size:1.25rem;">—</div>
+                    <p class="kpi-subtitle">Показатель обновляется автоматически каждые 30 секунд.</p>
+                </article>
+            </section>
+
+            <section class="table-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Сводная таблица</h3>
+                        <p>В таблицу попадают последние инциденты и важные события, подходящие для демонстрации, отчёта или быстрой коммуникации с руководителем.</p>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Статус</th>
+                                <th>Время</th>
+                                <th>Тип события</th>
+                                <th>Источник</th>
+                                <th>Важность</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody"><tr><td colspan="6" class="table-empty">Ждём данные для отчёта.</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
         </div>
     </main>
 </div>

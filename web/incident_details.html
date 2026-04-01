@@ -9,23 +9,87 @@
 <body>
 <div class="page-shell">
     <aside class="sidebar">
-        <div class="brand-box"><div class="brand-mark">BS</div><div class="brand-copy"><h1>BARSUKSIEM</h1><p>Карточка расследования</p></div></div>
+        <div class="brand-box">
+            <div class="brand-mark">BS</div>
+            <div class="brand-copy">
+                <h1>BARSUKSIEM</h1>
+                <p>Карточка расследования</p>
+            </div>
+        </div>
+
         <nav class="nav-list">
             <a class="nav-link" href="/"><div class="nav-label"><strong>Панель SOC</strong><span>Оперативная сводка</span></div></a>
             <a class="nav-link is-active" href="/incidents"><div class="nav-label"><strong>Инциденты</strong><span>Назад к списку расследований</span></div></a>
             <a class="nav-link" href="/logs"><div class="nav-label"><strong>Журналы</strong><span>Связанные события</span></div></a>
             <a class="nav-link" href="/analytics"><div class="nav-label"><strong>Аналитика</strong><span>Отчёты и сводки</span></div></a>
         </nav>
-        <div class="sidebar-card"><h3>Что делать дальше</h3><div id="nextActionsList" class="favorite-list"><p class="helper-text">Рекомендации появятся после загрузки инцидента.</p></div></div>
+
+        <div class="sidebar-card">
+            <h3>Что делать дальше</h3>
+            <div id="nextActionsList" class="favorite-list"><p class="helper-text">Рекомендации появятся после загрузки данных инцидента.</p></div>
+        </div>
     </aside>
+
     <main class="main-pane">
         <header class="topbar">
-            <div class="topbar-title"><h2>Карточка инцидента</h2><p>Пошаговый разбор: что произошло, почему сработало правило и какие события связаны с детектом.</p></div>
-            <div class="topbar-actions"><input id="incidentHeaderSearch" class="search-input" type="search" placeholder="Найти связанный лог, host или ID события"><a id="relatedLogsBtn" class="btn btn-secondary" href="/logs">Связанные логи</a><button id="copyIncidentSummaryBtn" class="btn btn-primary">Скопировать сводку</button><div class="user-chip"><span id="username">Аудитор</span></div></div>
+            <div class="topbar-title">
+                <h2>Карточка инцидента</h2>
+                <p>Пошаговый разбор: что произошло, почему сработало правило, какие события подтверждают детект и какие действия нужны дальше.</p>
+            </div>
+            <div class="topbar-actions">
+                <input id="incidentHeaderSearch" class="search-input" type="search" placeholder="Найти связанный лог, host или ID события">
+                <a id="relatedLogsBtn" class="btn btn-secondary" href="/logs">Связанные логи</a>
+                <button id="copyIncidentSummaryBtn" class="btn btn-primary">Скопировать сводку</button>
+                <div class="user-chip"><span id="username">Аудитор</span></div>
+            </div>
         </header>
+
         <div class="page-grid">
-            <section class="hero-panel"><div class="toolbar-row"><div class="stack"><div class="helper-text">Инцидент <span id="incidentId" class="mono">—</span></div><h1 style="font-size:2rem; line-height:1.08; max-width:18ch;">Расследование и подтверждение контекста детекта.</h1><p id="incidentSummary" class="helper-text">Описание инцидента появится после загрузки данных.</p></div><div class="toolbar-group"><span id="incidentSeverity" class="badge badge--warning">Ожидание</span><span id="incidentStatus" class="badge badge--primary">Без статуса</span></div></div><div class="info-grid"><div class="info-item"><h4>ID карточки</h4><p id="incidentTitleId">—</p></div><div class="info-item"><h4>Время обнаружения</h4><p id="incidentDetected">—</p></div><div class="info-item"><h4>Затронутые активы</h4><p id="incidentAssets">—</p></div><div class="info-item"><h4>Категория</h4><p id="incidentCategory">—</p></div><div class="info-item"><h4>Основной хост</h4><p id="incidentHost">—</p></div><div class="info-item"><h4>ОС</h4><p id="incidentOs">—</p></div><div class="info-item"><h4>Сегмент сети</h4><p id="incidentNetwork">—</p></div></div></section>
-            <div class="split-layout"><section class="table-panel"><div class="panel-header"><div><h3>Хронология инцидента</h3><p>События отсортированы по времени, чтобы было проще увидеть развитие атаки или ложного срабатывания.</p></div></div><div id="timelineList" class="timeline"><p class="helper-text">Хронология будет загружена после получения данных.</p></div></section><section class="side-panel"><div class="panel-header"><div><h3>Почему сработало правило</h3><p>Краткие доказательства и ключевые события, из-за которых система создала инцидент.</p></div><span id="evidenceCount" class="badge badge--primary">0 событий</span></div><div id="evidenceList" class="evidence-list"><p class="helper-text">Связанные события будут показаны после загрузки журнала.</p></div></section></div>
+            <section class="hero-panel stack">
+                <div class="toolbar-row">
+                    <div class="stack">
+                        <div class="helper-text">Инцидент <span id="incidentId" class="mono">—</span></div>
+                        <h1>Расследование и подтверждение контекста детекта</h1>
+                        <p id="incidentSummary" class="helper-text">Описание инцидента появится после загрузки данных.</p>
+                    </div>
+                    <div class="toolbar-group">
+                        <span id="incidentSeverity" class="badge badge--warning">Ожидание</span>
+                        <span id="incidentStatus" class="badge badge--primary">Без статуса</span>
+                    </div>
+                </div>
+                <div class="info-grid">
+                    <div class="info-item"><h4>ID карточки</h4><p id="incidentTitleId">—</p></div>
+                    <div class="info-item"><h4>Время обнаружения</h4><p id="incidentDetected">—</p></div>
+                    <div class="info-item"><h4>Затронутые активы</h4><p id="incidentAssets">—</p></div>
+                    <div class="info-item"><h4>Категория</h4><p id="incidentCategory">—</p></div>
+                    <div class="info-item"><h4>Основной хост</h4><p id="incidentHost">—</p></div>
+                    <div class="info-item"><h4>ОС</h4><p id="incidentOs">—</p></div>
+                    <div class="info-item"><h4>Сегмент сети</h4><p id="incidentNetwork">—</p></div>
+                </div>
+            </section>
+
+            <div class="split-layout">
+                <section class="table-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Хронология инцидента</h3>
+                            <p>События сортируются по времени, чтобы было проще увидеть развитие атаки, её источник и последующие действия оператора или пользователя.</p>
+                        </div>
+                    </div>
+                    <div id="timelineList" class="timeline"><p class="helper-text">Хронология будет загружена после получения данных.</p></div>
+                </section>
+
+                <section class="side-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Почему сработало правило</h3>
+                            <p>Здесь собраны ключевые события и признаки, из-за которых система подняла инцидент.</p>
+                        </div>
+                        <span id="evidenceCount" class="badge badge--primary">0 событий</span>
+                    </div>
+                    <div id="evidenceList" class="evidence-list"><p class="helper-text">Связанные события будут показаны после загрузки журнала.</p></div>
+                </section>
+            </div>
         </div>
     </main>
 </div>

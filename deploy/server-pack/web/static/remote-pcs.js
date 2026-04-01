@@ -1,10 +1,13 @@
 const {
+    buildLogsUrl,
     checkPageAuth,
     escapeHtml,
+    persistRecentAction,
     setText,
     setupLogout,
 } = window.AppShell;
 const { getAgentStats, getStats } = window.DataClient;
+
 let autoRefreshTimer = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -26,31 +29,36 @@ async function loadInventory() {
     ]);
     renderInventory(agents?.last_seen || {});
     updateCards(agents, stats);
+    persistRecentAction({ title: 'Активы', url: window.location.href, ts: new Date().toISOString() });
 }
 
 function renderInventory(lastSeen) {
     const tbody = document.getElementById('inventoryTableBody');
     const footer = document.getElementById('inventoryFooter');
     if (!tbody || !footer) return;
-    const hosts = Object.entries(lastSeen);
+
+    const hosts = Object.entries(lastSeen).sort((left, right) => String(left[0]).localeCompare(String(right[0]), 'ru'));
     if (!hosts.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Агенты ещё не передавали данные.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Агенты ещё не передавали heartbeat.</td></tr>';
         footer.textContent = 'Показано 0 из 0';
         return;
     }
+
     tbody.innerHTML = hosts.slice(0, 20).map(([host, ts]) => {
-        const status = ts ? 'Онлайн' : 'Офлайн';
-        const statusClass = ts ? 'badge badge--success' : 'badge badge--danger';
+        const isOnline = Boolean(ts);
+        const statusLabel = isOnline ? 'Онлайн' : 'Офлайн';
+        const statusClass = isOnline ? 'badge badge--success' : 'badge badge--danger';
         const lastSeenText = ts ? new Date(ts).toLocaleString('ru-RU') : '--';
+        const targetUrl = buildLogsUrl({ host, time: '24h' });
         return `
             <tr>
-                <td><input type="checkbox"></td>
+                <td><input type="checkbox" aria-label="Выбрать хост ${escapeHtml(host)}"></td>
                 <td><strong>${escapeHtml(host)}</strong></td>
                 <td class="mono">—</td>
                 <td>Рабочая станция</td>
-                <td><span class="${statusClass}">${status}</span></td>
-                <td class="mono">${lastSeenText}</td>
-                <td><div class="table-actions"><a href="/logs?host=${encodeURIComponent(host)}" class="action-link">Открыть логи</a></div></td>
+                <td><span class="${statusClass}">${statusLabel}</span></td>
+                <td class="mono">${escapeHtml(lastSeenText)}</td>
+                <td><div class="table-actions"><a href="${targetUrl}" class="action-link">Открыть логи</a></div></td>
             </tr>
         `;
     }).join('');
@@ -62,10 +70,10 @@ function updateCards(agents, stats) {
     const online = agents?.online || 0;
     const logsCount = stats?.total_events || 0;
     const onlinePercent = total > 0 ? ((online / total) * 100).toFixed(1) : '0';
-    setText('totalDevices', total);
-    setText('onlineCount', online);
+    setText('totalDevices', total.toLocaleString('ru-RU'));
+    setText('onlineCount', online.toLocaleString('ru-RU'));
     setText('onlinePercent', `${onlinePercent}% активных подключений`);
-    setText('logsCollected', logsCount.toLocaleString('ru-RU'));
+    setText('logsCollected', Number(logsCount || 0).toLocaleString('ru-RU'));
 }
 
 function setupSearch() {
@@ -75,7 +83,7 @@ function setupSearch() {
         const value = input.value.trim().toLowerCase();
         const rows = Array.from(document.querySelectorAll('#inventoryTableBody tr'));
         rows.forEach((row) => {
-            const text = row.textContent.toLowerCase();
+            const text = (row.textContent || '').toLowerCase();
             row.style.display = text.includes(value) ? '' : 'none';
         });
     });

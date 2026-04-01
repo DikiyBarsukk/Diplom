@@ -9,7 +9,14 @@
 <body>
 <div class="page-shell">
     <aside class="sidebar">
-        <div class="brand-box"><div class="brand-mark">BS</div><div class="brand-copy"><h1>BARSUKSIEM</h1><p>Аудит и соответствие</p></div></div>
+        <div class="brand-box">
+            <div class="brand-mark">BS</div>
+            <div class="brand-copy">
+                <h1>BARSUKSIEM</h1>
+                <p>Аудит пользователей и политик</p>
+            </div>
+        </div>
+
         <nav class="nav-list">
             <a class="nav-link" href="/"><div class="nav-label"><strong>Панель SOC</strong><span>Оперативная сводка</span></div></a>
             <a class="nav-link" href="/inventory"><div class="nav-label"><strong>Активы</strong><span>Удалённые хосты</span></div></a>
@@ -17,18 +24,97 @@
             <a class="nav-link" href="/analytics"><div class="nav-label"><strong>Аналитика</strong><span>Сводки и экспорт</span></div></a>
             <a class="nav-link is-active" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Пользователи и политики</span></div></a>
         </nav>
-        <div class="sidebar-card"><h3>Быстрые пресеты</h3><div id="reportPresetFilters" class="pill-row"></div></div>
-        <div class="sidebar-card"><h3>Топ пользователей</h3><div id="topUsersList" class="recent-list"><p class="helper-text">Нет данных для отображения.</p></div></div>
+
+        <div class="sidebar-card">
+            <h3>Быстрые пресеты</h3>
+            <div id="reportPresetFilters" class="pill-row"></div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3>Топ пользователей</h3>
+            <div id="topUsersList" class="recent-list"><p class="helper-text">Нет данных для отображения.</p></div>
+        </div>
     </aside>
+
     <main class="main-pane">
         <header class="topbar">
-            <div class="topbar-title"><h2>Аудит активности пользователей</h2><p>Сводка по сессиям, нарушениям политик, повышению привилегий и связанным событиям по выбранным активам.</p></div>
-            <div class="topbar-actions"><input id="complianceSearch" class="search-input" type="search" placeholder="Искать по пользователю, типу события или хосту"><button id="generateComplianceBtn" class="btn btn-primary">Сформировать</button><button id="exportComplianceBtn" class="btn btn-secondary">Экспорт CSV</button><button id="copyComplianceSummaryBtn" class="btn btn-ghost">Скопировать сводку</button><div class="user-chip"><span id="username">Аудитор</span><button id="logoutBtn" class="btn-link">Выход</button></div></div>
+            <div class="topbar-title">
+                <h2>Аудит активности пользователей</h2>
+                <p>Сводка по сессиям, нарушениям политик, повышению привилегий и связанным событиям по выбранным активам и временному периоду.</p>
+            </div>
+            <div class="topbar-actions">
+                <input id="complianceSearch" class="search-input" type="search" placeholder="Искать по пользователю, типу события или хосту">
+                <button id="generateComplianceBtn" class="btn btn-primary">Сформировать</button>
+                <button id="exportComplianceBtn" class="btn btn-secondary">Экспорт CSV</button>
+                <button id="copyComplianceSummaryBtn" class="btn btn-ghost">Скопировать сводку</button>
+                <div class="user-chip">
+                    <span id="username">Аудитор</span>
+                    <button id="logoutBtn" class="btn-link">Выход</button>
+                </div>
+            </div>
         </header>
+
         <div class="page-grid">
-            <section class="panel"><div class="panel-header"><div><h3>Параметры аудита</h3><p>Выберите период и активы, чтобы быстро сформировать отчёт именно по нужному сегменту.</p></div><div class="inline-actions"><span class="helper-text">Онлайн систем: <strong><span id="systemsOnline">0</span>/<span id="systemsTotal">0</span></strong></span></div></div><div class="filter-grid"><div class="field"><label for="assetSelect">Целевой актив</label><select id="assetSelect" class="select"><option value="all">Все удалённые ПК</option></select></div><div class="field"><label>Период отчёта</label><button id="periodButton" class="btn btn-secondary" type="button"><span id="periodLabel">За 7 дней</span></button></div><div class="field"><label>Действия</label><div class="toolbar-group"><button id="selectAllAssetsBtn" class="btn btn-ghost" type="button">Выбрать все</button><button id="resetAssetsBtn" class="btn btn-ghost" type="button">Сбросить</button><button id="analyzeLogsBtn" class="btn btn-secondary" type="button">Обновить данные</button></div></div></div></section>
-            <section class="card-grid"><article class="stat-card"><h3>Активные сессии</h3><div id="activeSessions" class="kpi-value">0</div><p class="kpi-subtitle">Живые пользовательские события в выбранном периоде.</p></article><article class="stat-card"><h3>Нарушения политик</h3><div id="policyViolations" class="kpi-value">0</div><p class="kpi-subtitle">Ошибки входа, отклонения и подозрительные операции.</p></article><article class="stat-card"><h3>Повышение привилегий</h3><div id="privEscalations" class="kpi-value">0</div><p class="kpi-subtitle">Критичные изменения прав и роли пользователей.</p></article><article class="stat-card"><h3>Оценка аудита</h3><div id="auditScore" class="kpi-value">0/100</div><p class="kpi-subtitle">Интегральная оценка по текущим журналам и нарушениям.</p></article></section>
-            <section class="table-panel"><div class="panel-header"><div><h3>События аудита</h3><p>Таблица предназначена для проверки действий пользователей и быстрого перехода в журналы.</p></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Пользователь</th><th>Тип события</th><th>Хост</th><th>Время</th><th>Риск</th><th>Действие</th></tr></thead><tbody id="complianceTableBody"><tr><td colspan="6" class="table-empty">Загрузка аудиторских событий...</td></tr></tbody></table></div></section>
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Параметры аудита</h3>
+                        <p>Выберите период и актив, чтобы быстро собрать отчёт по конкретному сегменту, пользователю или группе удалённых хостов.</p>
+                    </div>
+                    <div class="inline-actions">
+                        <span class="helper-text">Онлайн систем: <strong><span id="systemsOnline">0</span>/<span id="systemsTotal">0</span></strong></span>
+                    </div>
+                </div>
+                <div class="filter-grid">
+                    <div class="field">
+                        <label for="assetSelect">Целевой актив</label>
+                        <select id="assetSelect" class="select"><option value="all">Все удалённые ПК</option></select>
+                    </div>
+                    <div class="field">
+                        <label>Период отчёта</label>
+                        <button id="periodButton" class="btn btn-secondary" type="button"><span id="periodLabel">За 7 дней</span></button>
+                    </div>
+                    <div class="field">
+                        <label>Действия</label>
+                        <div class="toolbar-group">
+                            <button id="selectAllAssetsBtn" class="btn btn-ghost" type="button">Выбрать все</button>
+                            <button id="resetAssetsBtn" class="btn btn-ghost" type="button">Сбросить</button>
+                            <button id="analyzeLogsBtn" class="btn btn-secondary" type="button">Обновить данные</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card-grid">
+                <article class="stat-card"><h3>Активные сессии</h3><div id="activeSessions" class="kpi-value">0</div><p class="kpi-subtitle">Живые пользовательские события в выбранном периоде.</p></article>
+                <article class="stat-card"><h3>Нарушения политик</h3><div id="policyViolations" class="kpi-value">0</div><p class="kpi-subtitle">Ошибки входа, отклонения и подозрительные операции.</p></article>
+                <article class="stat-card"><h3>Повышение привилегий</h3><div id="privEscalations" class="kpi-value">0</div><p class="kpi-subtitle">Критичные изменения ролей и прав доступа.</p></article>
+                <article class="stat-card"><h3>Оценка аудита</h3><div id="auditScore" class="kpi-value">0/100</div><p class="kpi-subtitle">Интегральная оценка по текущим логам и нарушениям.</p></article>
+            </section>
+
+            <section class="table-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>События аудита</h3>
+                        <p>Таблица нужна для проверки действий пользователей и быстрого перехода к первичным журналам конкретного хоста или события.</p>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Тип события</th>
+                                <th>Хост</th>
+                                <th>Время</th>
+                                <th>Риск</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="complianceTableBody"><tr><td colspan="6" class="table-empty">Загрузка аудиторских событий...</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
         </div>
     </main>
 </div>

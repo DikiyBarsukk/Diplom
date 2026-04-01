@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -9,18 +9,42 @@
 <body>
     <div class="login-shell">
         <div class="login-card">
-            <div class="login-brand">
-                <div class="brand-mark">BS</div>
-                <div class="brand-copy">
-                    <h1>BARSUKSIEM</h1>
-                    <p>Центр удалённого аудита и расследования событий ИБ</p>
+            <aside class="login-aside stack">
+                <div class="login-brand">
+                    <div class="brand-box">
+                        <div class="brand-mark">BS</div>
+                        <div class="brand-copy">
+                            <h1>BARSUKSIEM</h1>
+                            <p>Платформа удалённого аудита и расследования событий ИБ</p>
+                        </div>
+                    </div>
+                    <div class="login-copy">
+                        <span class="panel-eyebrow">Offline-first SOC</span>
+                        <h1>Оперативный контроль, инциденты и аудит в одном окне.</h1>
+                        <p>Стендовая дипломная версия не зависит от внешних CDN, шрифтов и иконок. Всё оформление и логика загружаются локально с сервера.</p>
+                    </div>
                 </div>
-            </div>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <strong>Панель SOC</strong>
+                        <span class="helper-text">Главный экран показывает текущий риск, критичные события и свежесть телеметрии.</span>
+                    </div>
+                    <div class="feature-item">
+                        <strong>Быстрый переход к расследованию</strong>
+                        <span class="helper-text">Из списка инцидентов можно сразу открыть связанные логи и карточку детекта.</span>
+                    </div>
+                    <div class="feature-item">
+                        <strong>Полностью локальный запуск</strong>
+                        <span class="helper-text">Интерфейс одинаково работает на Ubuntu ВМ и при дополнительном доступе с Windows-хоста по IP сервера.</span>
+                    </div>
+                </div>
+            </aside>
 
-            <div class="hero-panel" style="padding:0;border:0;background:none;box-shadow:none;">
+            <section class="hero-panel stack">
                 <div>
-                    <h1>Вход в систему</h1>
-                    <p>Локальная offline-first версия для дипломной демонстрации. Сервер, агент и аудит работают без внешних CDN.</p>
+                    <span class="panel-eyebrow">Авторизация</span>
+                    <h2 style="margin-top:10px; font-size:2rem; line-height:1.06;">Вход в BARSUKSIEM</h2>
+                    <p class="helper-text" style="margin-top:10px; max-width:56ch;">Введите учётные данные администратора или аудитора для доступа к журналам, инцидентам, аналитике и удалённому аудиту.</p>
                 </div>
 
                 <div class="error-box" id="errorMessage"></div>
@@ -28,20 +52,26 @@
                 <form id="loginForm" class="stack">
                     <div class="field">
                         <label for="username">Имя пользователя</label>
-                        <input class="input" type="text" id="username" name="username" required autofocus>
+                        <input class="input" type="text" id="username" name="username" placeholder="admin" required autofocus>
                     </div>
                     <div class="field">
                         <label for="password">Пароль</label>
-                        <input class="input" type="password" id="password" name="password" required>
+                        <input class="input" type="password" id="password" name="password" placeholder="Введите пароль" required>
                     </div>
-                    <button type="submit" class="btn btn-primary" id="loginBtn">Войти</button>
+                    <div class="toolbar-row">
+                        <button type="submit" class="btn btn-primary" id="loginBtn">Войти</button>
+                        <span class="helper-text">После входа откроется главная панель SOC.</span>
+                    </div>
                 </form>
 
                 <div class="login-note">
-                    <p><strong>Стандартный вход для дипломной версии:</strong> <code>admin / admin123</code></p>
-                    <p class="footer-note" style="margin-top:8px;">Если вход не подходит, значит используется старая SQLite-база с прежней учётной записью.</p>
+                    <div class="feature-item">
+                        <strong>Стандартный вход для дипломной версии</strong>
+                        <span><code>admin / admin123</code></span>
+                    </div>
+                    <p class="footer-note">Если стандартный вход не подходит, значит на сервере уже используется старая SQLite-база с другой учётной записью администратора.</p>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 

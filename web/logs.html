@@ -9,48 +9,184 @@
 <body>
 <div class="page-shell">
     <aside class="sidebar">
-        <div class="brand-box"><div class="brand-mark">BS</div><div class="brand-copy"><h1>BARSUKSIEM</h1><p>Обозреватель журналов</p></div></div>
+        <div class="brand-box">
+            <div class="brand-mark">BS</div>
+            <div class="brand-copy">
+                <h1>BARSUKSIEM</h1>
+                <p>Обозреватель событий и журналов</p>
+            </div>
+        </div>
+
         <nav class="nav-list">
             <a class="nav-link" href="/"><div class="nav-label"><strong>Панель SOC</strong><span>Оперативная сводка</span></div></a>
-            <a class="nav-link" href="/incidents"><div class="nav-label"><strong>Инциденты</strong><span>Триаж и статусы</span></div></a>
-            <a class="nav-link is-active" href="/logs"><div class="nav-label"><strong>Журналы</strong><span>Фильтрация событий</span></div></a>
-            <a class="nav-link" href="/analytics"><div class="nav-label"><strong>Аналитика</strong><span>Отчёты и экспорт</span></div></a>
-            <a class="nav-link" href="/inventory"><div class="nav-label"><strong>Активы</strong><span>Хосты и агенты</span></div></a>
-            <a class="nav-link" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Соответствие</span></div></a>
+            <a class="nav-link" href="/incidents"><div class="nav-label"><strong>Инциденты</strong><span>Триаж и расследование</span></div></a>
+            <a class="nav-link is-active" href="/logs"><div class="nav-label"><strong>Журналы</strong><span>Фильтрация и детализация</span></div></a>
+            <a class="nav-link" href="/analytics"><div class="nav-label"><strong>Аналитика</strong><span>Сводки и экспорт</span></div></a>
+            <a class="nav-link" href="/inventory"><div class="nav-label"><strong>Активы</strong><span>Удалённые хосты</span></div></a>
+            <a class="nav-link" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Пользователи и политики</span></div></a>
         </nav>
+
         <div class="sidebar-card">
             <h3>Фильтры</h3>
             <div class="filter-grid">
-                <div class="field"><label for="hostFilter">Хост</label><select id="hostFilter" class="select"><option value="">Все хосты</option></select></div>
-                <div class="field"><label for="severityFilter">Важность</label><select id="severityFilter" class="select"><option value="">Все уровни</option><option value="emerg">Аварийная</option><option value="alert">Тревога</option><option value="crit">Критическая</option><option value="err">Ошибка</option><option value="warn">Предупреждение</option><option value="notice">Уведомление</option><option value="info">Информационная</option><option value="debug">Отладка</option></select></div>
-                <div class="field"><label for="timeFilter">Период</label><select id="timeFilter" class="select"><option value="1h">Последний час</option><option value="6h">Последние 6 часов</option><option value="24h">Последние 24 часа</option><option value="7d">Последние 7 дней</option><option value="custom">Произвольный диапазон</option></select></div>
+                <div class="field">
+                    <label for="hostFilter">Хост</label>
+                    <select id="hostFilter" class="select"><option value="">Все хосты</option></select>
+                </div>
+                <div class="field">
+                    <label for="severityFilter">Важность</label>
+                    <select id="severityFilter" class="select">
+                        <option value="">Все уровни</option>
+                        <option value="emerg">Аварийная</option>
+                        <option value="alert">Тревога</option>
+                        <option value="crit">Критическая</option>
+                        <option value="err">Ошибка</option>
+                        <option value="warn">Предупреждение</option>
+                        <option value="notice">Уведомление</option>
+                        <option value="info">Информационная</option>
+                        <option value="debug">Отладка</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="timeFilter">Период</label>
+                    <select id="timeFilter" class="select">
+                        <option value="1h">Последний час</option>
+                        <option value="6h">Последние 6 часов</option>
+                        <option value="24h">Последние 24 часа</option>
+                        <option value="7d">Последние 7 дней</option>
+                        <option value="custom">Произвольный диапазон</option>
+                    </select>
+                </div>
             </div>
             <div id="customDateRange" class="stack hidden" style="margin-top:12px;">
-                <div class="field"><label for="dateFrom">Начало периода</label><input id="dateFrom" class="input" type="datetime-local"></div>
-                <div class="field"><label for="dateTo">Конец периода</label><input id="dateTo" class="input" type="datetime-local"></div>
+                <div class="field">
+                    <label for="dateFrom">Начало периода</label>
+                    <input id="dateFrom" class="input" type="datetime-local">
+                </div>
+                <div class="field">
+                    <label for="dateTo">Конец периода</label>
+                    <input id="dateTo" class="input" type="datetime-local">
+                </div>
             </div>
-            <div class="toolbar-group" style="margin-top:14px;"><button id="resetFiltersBtn" class="btn btn-ghost">Сбросить</button><button id="saveFilterBtn" class="btn btn-secondary">Сохранить</button><button id="settingsSidebarBtn" class="btn btn-secondary">Настройки</button></div>
+            <div class="toolbar-group" style="margin-top:14px;">
+                <button id="resetFiltersBtn" class="btn btn-ghost">Сбросить</button>
+                <button id="saveFilterBtn" class="btn btn-secondary">Сохранить</button>
+                <button id="settingsSidebarBtn" class="btn btn-secondary">Параметры</button>
+            </div>
         </div>
-        <div class="sidebar-card"><h3>Быстрые наборы</h3><div id="presetFilters" class="pill-row"></div></div>
-        <div class="sidebar-card"><h3>Сохранённые фильтры</h3><div id="favoriteFiltersList" class="favorite-list"><p class="helper-text">Сохранённых фильтров пока нет.</p></div></div>
+
+        <div class="sidebar-card">
+            <h3>Быстрые наборы</h3>
+            <div id="presetFilters" class="pill-row"></div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3>Сохранённые фильтры</h3>
+            <div id="favoriteFiltersList" class="favorite-list"><p class="helper-text">Сохранённых фильтров пока нет.</p></div>
+        </div>
     </aside>
+
     <main class="main-pane">
         <header class="topbar">
-            <div class="topbar-title"><h2>Обозреватель журналов</h2><p id="resultsSummary">Ждём первую загрузку данных и строим контекст расследования.</p></div>
-            <div class="topbar-actions"><input id="searchInput" class="search-input" type="search" placeholder="Искать по Event ID, PowerShell, логину или IP"><button id="themeToggle" class="btn btn-ghost" type="button">Тема</button><button id="refreshBtn" class="btn btn-primary">Обновить</button><button id="exportBtn" class="btn btn-secondary">Экспорт CSV</button><button id="settingsBtn" class="btn btn-ghost">Параметры</button><div class="user-chip"><span id="username">Аудитор</span><button id="logoutBtn" class="btn-link">Выход</button></div></div>
+            <div class="topbar-title">
+                <h2>Поток событий</h2>
+                <p id="resultsSummary">Здесь собирается контекст расследования: критичные записи, ошибки входа, PowerShell-активность и события конкретных хостов.</p>
+            </div>
+            <div class="topbar-actions">
+                <input id="searchInput" class="search-input" type="search" placeholder="Искать по Event ID, сообщению, учётной записи или IP">
+                <button id="refreshBtn" class="btn btn-primary">Обновить</button>
+                <button id="exportBtn" class="btn btn-secondary">Экспорт CSV</button>
+                <button id="settingsBtn" class="btn btn-ghost">Параметры</button>
+                <div class="user-chip">
+                    <span id="username">Аудитор</span>
+                    <button id="logoutBtn" class="btn-link">Выход</button>
+                </div>
+            </div>
         </header>
+
         <div class="page-grid">
-            <section class="hero-panel"><div class="toolbar-row"><div><h3>Быстрый обзор потока</h3><p class="helper-text">Preset-фильтры, счётчики и свежесть телеметрии теперь собраны в одном месте.</p></div><div class="inline-actions"><span class="badge badge--success" id="table-info">Ожидание</span><span class="badge badge--warning" id="agentSync">Источники пока не передавали логи</span></div></div></section>
+            <section class="hero-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Быстрый обзор потока</h3>
+                        <p>Preset-фильтры и счётчики помогают за секунды переключиться между критичными, свежими и связанными событиями.</p>
+                    </div>
+                    <div class="inline-actions">
+                        <span class="badge badge--primary" id="table-info">Ожидание</span>
+                        <span class="badge badge--warning" id="agentSync">Источники пока не передавали логи</span>
+                    </div>
+                </div>
+            </section>
+
             <section class="table-panel">
-                <div class="panel-header"><div><h3>Поток событий</h3><p>Кликните по строке, чтобы открыть карточку события и связанный контекст.</p></div></div>
-                <div class="table-scroll"><table class="data-table"><thead><tr><th class="sortable" data-sort="ts">Время</th><th class="sortable" data-sort="severity">Важность</th><th class="sortable" data-sort="host">Хост</th><th class="sortable" data-sort="unit">Служба</th><th class="sortable" data-sort="pid">PID</th><th>Сообщение</th></tr></thead><tbody id="logsTableBody"><tr><td colspan="6" class="table-empty">Загрузка журнала событий...</td></tr></tbody></table></div>
-                <div class="toolbar-row" style="margin-top:16px;"><div id="pageInfo" class="helper-text">Страница 1 из 1</div><div class="toolbar-group"><button id="prevPage" class="btn btn-ghost">Назад</button><button id="nextPage" class="btn btn-secondary">Вперёд</button></div></div>
+                <div class="panel-header">
+                    <div>
+                        <h3>Журнал событий</h3>
+                        <p>Щёлкните по строке, чтобы открыть карточку события и увидеть всю техническую детализацию без перехода на другую страницу.</p>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="ts">Время</th>
+                                <th class="sortable" data-sort="severity">Важность</th>
+                                <th class="sortable" data-sort="host">Хост</th>
+                                <th class="sortable" data-sort="unit">Служба</th>
+                                <th class="sortable" data-sort="pid">PID</th>
+                                <th>Сообщение</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody"><tr><td colspan="6" class="table-empty">Загрузка журнала событий...</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="toolbar-row" style="margin-top:16px;">
+                    <div id="pageInfo" class="helper-text">Страница 1 из 1</div>
+                    <div class="toolbar-group">
+                        <button id="prevPage" class="btn btn-ghost">Назад</button>
+                        <button id="nextPage" class="btn btn-secondary">Вперёд</button>
+                    </div>
+                </div>
             </section>
         </div>
     </main>
 </div>
-<div id="eventModal" class="modal hidden"><div class="modal-card"><div class="toolbar-row" style="margin-bottom:14px;"><h3>Детали события</h3><button id="modalClose" class="btn btn-ghost">Закрыть</button></div><div id="modalBody"></div></div></div>
-<div id="settingsModal" class="modal hidden"><div class="modal-card"><div class="toolbar-row" style="margin-bottom:14px;"><h3>Настройки журнала</h3><button id="settingsClose" class="btn btn-ghost">Закрыть</button></div><div class="stack"><div class="field"><label for="refreshInterval">Интервал автообновления</label><select id="refreshInterval" class="select"><option value="10">10 секунд</option><option value="30" selected>30 секунд</option><option value="60">1 минута</option><option value="300">5 минут</option><option value="0">Отключить</option></select></div><label class="inline-actions" for="autoRefreshEnabled"><input id="autoRefreshEnabled" type="checkbox" checked><span>Включить автообновление</span></label></div></div></div>
+
+<div id="eventModal" class="modal hidden">
+    <div class="modal-card">
+        <div class="toolbar-row" style="margin-bottom:14px;">
+            <h3>Детали события</h3>
+            <button id="modalClose" class="btn btn-ghost">Закрыть</button>
+        </div>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<div id="settingsModal" class="modal hidden">
+    <div class="modal-card">
+        <div class="toolbar-row" style="margin-bottom:14px;">
+            <h3>Параметры журнала</h3>
+            <button id="settingsClose" class="btn btn-ghost">Закрыть</button>
+        </div>
+        <div class="stack">
+            <div class="field">
+                <label for="refreshInterval">Интервал автообновления</label>
+                <select id="refreshInterval" class="select">
+                    <option value="10">10 секунд</option>
+                    <option value="30" selected>30 секунд</option>
+                    <option value="60">1 минута</option>
+                    <option value="300">5 минут</option>
+                    <option value="0">Отключить</option>
+                </select>
+            </div>
+            <label class="inline-actions" for="autoRefreshEnabled">
+                <input id="autoRefreshEnabled" type="checkbox" checked>
+                <span>Включить автообновление</span>
+            </label>
+        </div>
+    </div>
+</div>
+
 <script src="/static/auth-client.js"></script>
 <script src="/static/app-shell.js"></script>
 <script src="/static/data-client.js"></script>

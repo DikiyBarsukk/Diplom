@@ -13,79 +13,169 @@
             <div class="brand-mark">BS</div>
             <div class="brand-copy">
                 <h1>BARSUKSIEM</h1>
-                <p>Offline-first центр мониторинга ИБ</p>
+                <p>Панель удалённого мониторинга ИБ</p>
             </div>
         </div>
+
         <nav class="nav-list">
-            <a class="nav-link is-active" href="/"><div class="nav-label"><strong>Панель SOC</strong><span>Главная оперативная сводка</span></div><span class="nav-pill">LIVE</span></a>
-            <a class="nav-link" href="/incidents"><div class="nav-label"><strong>Инциденты</strong><span>Триаж и расследование</span></div><span id="incidents-badge" class="nav-pill" style="display:none;">0</span></a>
-            <a class="nav-link" href="/logs"><div class="nav-label"><strong>Журналы</strong><span>Поиск и фильтрация событий</span></div></a>
-            <a class="nav-link" href="/analytics"><div class="nav-label"><strong>Аналитика</strong><span>Отчёты и сводки</span></div></a>
-            <a class="nav-link" href="/inventory"><div class="nav-label"><strong>Активы</strong><span>Удалённые хосты и агенты</span></div></a>
-            <a class="nav-link" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Соответствие и проверки</span></div></a>
+            <a class="nav-link is-active" href="/">
+                <div class="nav-label">
+                    <strong>Панель SOC</strong>
+                    <span>Главная оперативная сводка</span>
+                </div>
+                <span class="nav-pill">LIVE</span>
+            </a>
+            <a class="nav-link" href="/incidents">
+                <div class="nav-label">
+                    <strong>Инциденты</strong>
+                    <span>Триаж и расследование</span>
+                </div>
+                <span id="incidents-badge" class="nav-pill" style="display:none;">0</span>
+            </a>
+            <a class="nav-link" href="/logs">
+                <div class="nav-label">
+                    <strong>Журналы</strong>
+                    <span>Поиск и фильтрация событий</span>
+                </div>
+            </a>
+            <a class="nav-link" href="/analytics">
+                <div class="nav-label">
+                    <strong>Аналитика</strong>
+                    <span>Сводки и экспорт</span>
+                </div>
+            </a>
+            <a class="nav-link" href="/inventory">
+                <div class="nav-label">
+                    <strong>Активы</strong>
+                    <span>Удалённые хосты и агенты</span>
+                </div>
+            </a>
+            <a class="nav-link" href="/compliance">
+                <div class="nav-label">
+                    <strong>Аудит</strong>
+                    <span>Пользователи и политики</span>
+                </div>
+            </a>
         </nav>
+
         <div class="sidebar-card">
             <h3>Стенд защиты</h3>
-            <p>Сервер, агент и рабочее место аудитора работают без внешних CDN и шрифтов.</p>
+            <p>Основной сценарий работает на Ubuntu ВМ. Дополнительно тот же веб можно открыть и с Windows-хоста по IP серверной машины.</p>
             <p style="margin-top:10px;"><strong id="agentSync">Ожидаем данные от агентов</strong></p>
         </div>
+
         <div class="sidebar-card">
-            <h3>Что проверять на защите</h3>
+            <h3>Быстрые проверки</h3>
             <div class="link-list">
-                <a href="/logs">Появление логов после запуска агента</a>
-                <a href="/incidents">Новые детекты и статусы</a>
-                <a href="/analytics">Экспорт аналитики</a>
+                <a href="/logs" class="favorite-item">
+                    <strong>Проверить поток логов</strong>
+                    <span class="helper-text">Убедиться, что агент передаёт события и они попадают в журнал.</span>
+                </a>
+                <a href="/incidents" class="favorite-item">
+                    <strong>Открыть новые инциденты</strong>
+                    <span class="helper-text">Перейти в триаж, статусы и связанные логи.</span>
+                </a>
+                <a href="/analytics" class="favorite-item">
+                    <strong>Показать отчёты</strong>
+                    <span class="helper-text">Выгрузить краткую аналитическую сводку для демонстрации.</span>
+                </a>
             </div>
         </div>
     </aside>
+
     <main class="main-pane">
         <header class="topbar">
             <div class="topbar-title">
                 <h2>Панель SOC</h2>
-                <p>Оценка обстановки за 10 секунд: открытые инциденты, критичные события и свежесть телеметрии.</p>
+                <p>Главный экран за 10 секунд показывает текущий риск, открытые инциденты, критичный поток событий и свежесть телеметрии.</p>
             </div>
             <div class="topbar-actions">
-                <input id="reportsSearch" class="search-input" type="search" placeholder="Поиск по хосту, IP или событию">
+                <input id="reportsSearch" class="search-input" type="search" placeholder="Поиск по хосту, IP, типу события или инциденту">
                 <button id="previewReportBtn" class="btn btn-secondary">Обновить</button>
                 <button id="generateReportBtn" class="btn btn-primary">Экспорт CSV</button>
                 <button id="copyReportSummaryBtn" class="btn btn-ghost">Скопировать сводку</button>
-                <div class="user-chip"><span id="username">Аудитор</span><button id="logoutBtn" class="btn-link">Выход</button></div>
+                <div class="user-chip">
+                    <span id="username">Аудитор</span>
+                    <button id="logoutBtn" class="btn-link">Выход</button>
+                </div>
             </div>
         </header>
+
         <div class="page-grid">
             <section class="hero-panel split-layout">
                 <div class="stack">
-                    <div class="panel-header">
-                        <div><h3>Что требует внимания сейчас</h3><p id="lastUpdated">Последнее обновление: --</p></div>
-                        <span class="badge badge--warning">SOC обзор</span>
+                    <div>
+                        <span class="panel-eyebrow">Security operations center</span>
+                        <h1 style="margin-top:10px;">Что требует внимания прямо сейчас</h1>
+                        <p class="helper-text" style="margin-top:12px; max-width:64ch;">Используйте этот экран как стартовую точку для расследования: сначала оцените риск и свежесть телеметрии, затем переходите к критичным событиям и инцидентам.</p>
                     </div>
-                    <h1 style="font-size:2rem; line-height:1.1; max-width:14ch;">Оперативная сводка по удалённому аудиту безопасности.</h1>
-                    <p class="helper-text">Главный экран показывает текущий риск, критичные события и быстрый переход к расследованию без лишних кликов.</p>
-                    <div id="analyticsPresetFilters" class="pill-row"></div>
+                    <div class="pill-row" id="analyticsPresetFilters"></div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <h4>Последнее обновление</h4>
+                            <p id="lastUpdated">—</p>
+                        </div>
+                        <div class="info-item">
+                            <h4>Критичный поток</h4>
+                            <p id="criticalTrend">ожидаем телеметрию</p>
+                        </div>
+                        <div class="info-item">
+                            <h4>Состояние канала</h4>
+                            <p id="dashboardSyncStateText">Ожидание</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="panel" style="background:rgba(8,17,23,0.54);">
-                    <div class="panel-header"><div><h3>Текущий риск</h3><p>Оценка строится по доле критичных событий в общем потоке.</p></div></div>
-                    <div class="stack">
-                        <div><div id="riskLevel" class="kpi-value">Низкий</div><div id="riskHint" class="kpi-subtitle">Система выглядит стабильно</div></div>
-                        <div class="info-grid">
-                            <div class="info-item"><h4>Критичных событий</h4><p id="criticalTotal">0</p></div>
-                            <div class="info-item"><h4>Свежесть данных</h4><p id="criticalTrend">обновление ожидается</p></div>
-                            <div class="info-item"><h4>Телеметрия</h4><p id="dashboardSyncState">Источники ещё не передавали данные</p></div>
+
+                <div class="panel stack" style="background:rgba(9, 18, 25, 0.66);">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Текущий риск</h3>
+                            <p>Оценка строится по доле критичных событий в общем потоке и по количеству открытых расследований.</p>
+                        </div>
+                        <span id="riskLevel" class="badge badge--success">Низкий</span>
+                    </div>
+                    <div>
+                        <div class="kpi-value" id="criticalTotal">0</div>
+                        <p class="kpi-subtitle" id="riskHint">Система выглядит стабильно</p>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <h4>Открытые инциденты</h4>
+                            <p id="openIncidentCard">Мониторинг</p>
+                        </div>
+                        <div class="info-item">
+                            <h4>Критичных событий</h4>
+                            <p id="criticalTotalMirror">0</p>
                         </div>
                     </div>
                 </div>
             </section>
-            <section class="card-grid">
-                <article class="stat-card"><h3>Открытые инциденты</h3><div class="kpi-value" id="openIncidentCard">Мониторинг</div><p class="kpi-subtitle">Статусы и связанные логи доступны в один клик.</p></article>
-                <article class="stat-card"><h3>Критичный поток</h3><div class="kpi-value" id="criticalTotalMirror">0</div><p class="kpi-subtitle">Сводка по alert, emerg и crit из серверной статистики.</p></article>
-                <article class="stat-card"><h3>Последняя синхронизация</h3><div class="kpi-value" style="font-size:1.35rem;" id="dashboardSyncStateText">Ожидание</div><p class="kpi-subtitle">Проверьте запуск агента и появление новых сообщений в журналах.</p></article>
-            </section>
+
             <section class="table-panel">
-                <div class="panel-header"><div><h3>Краткая лента событий и инцидентов</h3><p>На этом экране собраны последние детекты и наиболее важные записи, чтобы быстро перейти в детали.</p></div><div class="inline-actions"><span class="status-inline status-inline--success">Обновляется автоматически</span></div></div>
+                <div class="panel-header">
+                    <div>
+                        <h3>Свежая лента событий и инцидентов</h3>
+                        <p>Таблица показывает последние значимые записи и позволяет в один клик открыть детальную карточку расследования или перейти к журналам.</p>
+                    </div>
+                    <div class="inline-actions">
+                        <span class="status-inline status-inline--success">Автообновление включено</span>
+                    </div>
+                </div>
                 <div class="table-scroll">
                     <table class="data-table">
-                        <thead><tr><th>Статус</th><th>Время</th><th>Тип</th><th>Источник</th><th>Важность</th><th>Действие</th></tr></thead>
-                        <tbody id="reportTableBody"><tr><td colspan="6" class="table-empty">Ожидаем данные от сервера.</td></tr></tbody>
+                        <thead>
+                            <tr>
+                                <th>Статус</th>
+                                <th>Время</th>
+                                <th>Тип</th>
+                                <th>Источник</th>
+                                <th>Важность</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody">
+                            <tr><td colspan="6" class="table-empty">Ожидаем данные от сервера.</td></tr>
+                        </tbody>
                     </table>
                 </div>
             </section>

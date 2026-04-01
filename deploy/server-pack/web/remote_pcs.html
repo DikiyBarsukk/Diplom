@@ -9,7 +9,14 @@
 <body>
 <div class="page-shell">
     <aside class="sidebar">
-        <div class="brand-box"><div class="brand-mark">BS</div><div class="brand-copy"><h1>BARSUKSIEM</h1><p>Активы и агенты</p></div></div>
+        <div class="brand-box">
+            <div class="brand-mark">BS</div>
+            <div class="brand-copy">
+                <h1>BARSUKSIEM</h1>
+                <p>Инвентаризация активов и агентов</p>
+            </div>
+        </div>
+
         <nav class="nav-list">
             <a class="nav-link" href="/"><div class="nav-label"><strong>Панель SOC</strong><span>Оперативная сводка</span></div></a>
             <a class="nav-link" href="/logs"><div class="nav-label"><strong>Журналы</strong><span>Поиск и фильтрация</span></div></a>
@@ -17,21 +24,66 @@
             <a class="nav-link is-active" href="/inventory"><div class="nav-label"><strong>Активы</strong><span>Удалённые хосты</span></div></a>
             <a class="nav-link" href="/compliance"><div class="nav-label"><strong>Аудит</strong><span>Пользователи и политики</span></div></a>
         </nav>
-        <div class="sidebar-card"><h3>Подсказка</h3><p>Этот экран нужен для быстрой проверки, какие агенты реально передают данные и на какие хосты уже можно перейти в журналы.</p></div>
+
+        <div class="sidebar-card">
+            <h3>Подсказка</h3>
+            <p>Экран помогает быстро понять, какие агенты реально передают heartbeat, и на какие хосты уже можно перейти в журналы без дополнительного поиска.</p>
+        </div>
     </aside>
+
     <main class="main-pane">
         <header class="topbar">
-            <div class="topbar-title"><h2>Удалённые ПК и агенты</h2><p>Мониторинг подключений, свежести heartbeat и переход к логам конкретного хоста.</p></div>
-            <div class="topbar-actions"><input id="pcSearch" class="search-input" type="search" placeholder="Искать по hostname или IP"><div class="user-chip"><span id="username">Аудитор</span><button id="logoutBtn" class="btn-link">Выход</button></div></div>
+            <div class="topbar-title">
+                <h2>Удалённые ПК и агенты</h2>
+                <p>Мониторинг подключений, свежести heartbeat и быстрый переход к событиям конкретного хоста прямо из инвентаризации.</p>
+            </div>
+            <div class="topbar-actions">
+                <input id="pcSearch" class="search-input" type="search" placeholder="Искать по hostname или IP">
+                <div class="user-chip">
+                    <span id="username">Аудитор</span>
+                    <button id="logoutBtn" class="btn-link">Выход</button>
+                </div>
+            </div>
         </header>
+
         <div class="page-grid">
-            <section class="card-grid"><article class="stat-card"><h3>Всего устройств</h3><div id="totalDevices" class="kpi-value">0</div><p class="kpi-subtitle">Количество активов, от которых сервер видел heartbeat.</p></article><article class="stat-card"><h3>Онлайн агентов</h3><div id="onlineCount" class="kpi-value">0</div><p id="onlinePercent" class="kpi-subtitle">0% активных подключений</p></article><article class="stat-card"><h3>Собрано логов</h3><div id="logsCollected" class="kpi-value">0</div><p class="kpi-subtitle">Суммарное число событий, доступных на сервере.</p></article></section>
-            <section class="table-panel"><div class="panel-header"><div><h3>Инвентаризация хостов</h3><p>Если агент появился в списке, можно сразу переходить к логам по конкретному хосту.</p></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th></th><th>Хост</th><th>IP</th><th>Тип</th><th>Статус</th><th>Последний heartbeat</th><th>Действие</th></tr></thead><tbody id="inventoryTableBody"><tr><td colspan="7" class="table-empty">Загрузка инвентаря...</td></tr></tbody></table></div><div id="inventoryFooter" class="helper-text" style="margin-top:14px;">Показано 0 из 0</div></section>
+            <section class="card-grid">
+                <article class="stat-card"><h3>Всего устройств</h3><div id="totalDevices" class="kpi-value">0</div><p class="kpi-subtitle">Количество активов, от которых сервер получал heartbeat.</p></article>
+                <article class="stat-card"><h3>Онлайн агентов</h3><div id="onlineCount" class="kpi-value">0</div><p id="onlinePercent" class="kpi-subtitle">0% активных подключений</p></article>
+                <article class="stat-card"><h3>Собрано логов</h3><div id="logsCollected" class="kpi-value">0</div><p class="kpi-subtitle">Суммарное число событий, доступных на сервере.</p></article>
+            </section>
+
+            <section class="table-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Инвентаризация хостов</h3>
+                        <p>Если агент появился в списке, значит по нему уже можно открыть связанные логи, оценить свежесть телеметрии и использовать хост в расследованиях.</p>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Хост</th>
+                                <th>IP</th>
+                                <th>Тип</th>
+                                <th>Статус</th>
+                                <th>Последний heartbeat</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody"><tr><td colspan="7" class="table-empty">Загрузка инвентаря...</td></tr></tbody>
+                    </table>
+                </div>
+                <div id="inventoryFooter" class="helper-text" style="margin-top:14px;">Показано 0 из 0</div>
+            </section>
         </div>
     </main>
 </div>
 <script src="/static/auth-client.js"></script>
 <script src="/static/app-shell.js"></script>
+<script src="/static/data-client.js"></script>
 <script src="/static/remote-pcs.js"></script>
 </body>
 </html>
