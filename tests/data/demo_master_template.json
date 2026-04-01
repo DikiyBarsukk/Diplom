@@ -1,0 +1,225 @@
+{
+  "metadata": {
+    "title": "BARSUKSIEM reproducible diploma demo",
+    "description": "Canonical demo dataset covering baseline activity and all five incident rules.",
+    "version": 1,
+    "expected_rules": ["R001", "R002", "R003", "R004", "R005"]
+  },
+  "events": [
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -14,
+      "host": "ops-srv-01",
+      "source": "journal",
+      "message": "scheduled backup completed successfully",
+      "process": "backupd",
+      "severity": "info"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -12,
+      "host": "ops-ws-01",
+      "source": "eventlog",
+      "message": "user session started for analyst",
+      "process": "winlogon",
+      "severity": "info"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -10,
+      "host": "ops-srv-01",
+      "source": "journal",
+      "message": "service health check completed",
+      "process": "systemd",
+      "severity": "info"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -8,
+      "host": "ops-ws-01",
+      "source": "eventlog",
+      "message": "configuration policy refreshed",
+      "process": "gpsvc",
+      "severity": "info"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -6,
+      "host": "ops-srv-01",
+      "source": "journal",
+      "message": "ssh connection closed cleanly",
+      "process": "sshd",
+      "severity": "notice"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -4,
+      "host": "ops-ws-01",
+      "source": "eventlog",
+      "message": "defender quick scan finished",
+      "process": "MsMpEng",
+      "severity": "info"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -2,
+      "host": "ops-srv-01",
+      "source": "journal",
+      "message": "nginx worker recycled gracefully",
+      "process": "nginx",
+      "severity": "info"
+    },
+    {
+      "block": "baseline",
+      "anchor": "now",
+      "offset_minutes": -1,
+      "host": "ops-ws-01",
+      "source": "eventlog",
+      "message": "vpn tunnel healthy",
+      "process": "vpnagent",
+      "severity": "info"
+    },
+    {
+      "block": "R005",
+      "anchor": "now",
+      "offset_minutes": -20,
+      "host": "priv-esc-01",
+      "source": "eventlog",
+      "message": "failed login for operator",
+      "severity": "err",
+      "raw": {"EventID": 4625}
+    },
+    {
+      "block": "R005",
+      "anchor": "now",
+      "offset_minutes": -18,
+      "host": "priv-esc-01",
+      "source": "eventlog",
+      "message": "failed login for operator",
+      "severity": "err",
+      "raw": {"EventID": 4625}
+    },
+    {
+      "block": "R005",
+      "anchor": "now",
+      "offset_minutes": -16,
+      "host": "priv-esc-01",
+      "source": "eventlog",
+      "message": "successful login for operator",
+      "severity": "info",
+      "raw": {"EventID": 4624}
+    },
+    {
+      "block": "R005",
+      "anchor": "now",
+      "offset_minutes": -14,
+      "host": "priv-esc-01",
+      "source": "eventlog",
+      "message": "privilege login granted to operator",
+      "severity": "warn",
+      "raw": {"EventID": 4672}
+    },
+    {
+      "block": "R004",
+      "anchor": "now",
+      "offset_minutes": -11,
+      "host": "tamper-01",
+      "source": "eventlog",
+      "message": "wevtutil cl Security",
+      "process": "wevtutil",
+      "severity": "crit"
+    },
+    {
+      "block": "R004",
+      "anchor": "now",
+      "offset_minutes": -10,
+      "host": "tamper-01",
+      "source": "journal",
+      "message": "journalctl --vacuum-time=1s",
+      "process": "journalctl",
+      "severity": "crit"
+    },
+    {
+      "block": "R001",
+      "anchor": "now",
+      "offset_minutes": -10,
+      "host": "bf-srv-01",
+      "source": "eventlog",
+      "message": "login_failed for admin",
+      "severity": "err"
+    },
+    {
+      "block": "R001",
+      "anchor": "now",
+      "offset_minutes": -8,
+      "host": "bf-srv-01",
+      "source": "eventlog",
+      "message": "login_failed for admin",
+      "severity": "err"
+    },
+    {
+      "block": "R001",
+      "anchor": "now",
+      "offset_minutes": -6,
+      "host": "bf-srv-01",
+      "source": "eventlog",
+      "message": "login_failed for admin",
+      "severity": "err"
+    },
+    {
+      "block": "R001",
+      "anchor": "now",
+      "offset_minutes": -4,
+      "host": "bf-srv-01",
+      "source": "eventlog",
+      "message": "login_failed for admin",
+      "severity": "err"
+    },
+    {
+      "block": "R001",
+      "anchor": "now",
+      "offset_minutes": -2,
+      "host": "bf-srv-01",
+      "source": "eventlog",
+      "message": "login_failed for admin",
+      "severity": "err"
+    },
+    {
+      "block": "R003",
+      "anchor": "now",
+      "offset_minutes": -7,
+      "host": "powershell-01",
+      "source": "eventlog",
+      "message": "PowerShell started by user",
+      "process": "powershell",
+      "severity": "warn"
+    },
+    {
+      "block": "R003",
+      "anchor": "now",
+      "offset_minutes": -3,
+      "host": "powershell-01",
+      "source": "eventlog",
+      "message": "invoke-webrequest download payload",
+      "process": "powershell",
+      "severity": "err"
+    },
+    {
+      "block": "R002",
+      "anchor": "night_window",
+      "offset_minutes": 0,
+      "host": "night-admin-01",
+      "source": "eventlog",
+      "message": "login_success admin from console",
+      "unit": "admin",
+      "severity": "warn"
+    }
+  ]
+}

@@ -1,79 +1,84 @@
-﻿# Linux demo-сценарий для защиты BARSUKSIEM
+# Linux demo-сценарий для защиты BARSUKSIEM
 
 ## Цель
 
-Показать на одной Linux-машине или в двух VM полный поток:
+Показать на Ubuntu предсказуемый стенд:
 
-`agent -> /api/logs -> storage -> incidents -> web UI`
+`demo fixture -> /api/logs -> storage -> incidents -> web UI`
 
-## Подготовка
+Основной сценарий больше не зависит от live-агента. Все ключевые кейсы заранее загружаются в отдельную demo-БД.
 
-```bash
-export BARSUKSIEM_BOOTSTRAP_ADMIN_USERNAME=admin
-export BARSUKSIEM_BOOTSTRAP_ADMIN_PASSWORD=Admin123!Test
-export CORS_ALLOWED_ORIGINS=http://127.0.0.1:8080,http://localhost:8080
-```
+## Быстрый запуск demo-стенда
 
-## Шаг 1. Запуск сервера
+На серверной Ubuntu ВМ:
 
 ```bash
-python main.py server --host 0.0.0.0 --port 8080
+cd /opt/barsuksiem/server-pack
+chmod +x *.sh
+./install.sh
+./reset-demo.sh
 ```
 
-Проверка:
+Что делает `reset-demo.sh`:
+- останавливает старый demo-сервер, если он был запущен;
+- удаляет `data/demo.db`;
+- запускает новый demo-сервер на отдельной БД;
+- ждёт `GET /health`;
+- загружает demo-данные через loader.
+
+## Вход в систему
+
+Основной доступ на Ubuntu:
+
+```text
+http://127.0.0.1:8080/login
+```
+
+Дополнительный доступ из сети:
+
+```text
+http://192.168.0.159:8080/login
+```
+
+Учётные данные:
+- логин: `admin`
+- пароль: `admin123`
+
+## Основной порядок показа
+
+1. Открыть `/` и показать, что система видит поток событий, риск и открытые инциденты.
+2. Перейти в `/incidents` и показать 5 типов инцидентов.
+3. Открыть 2-3 карточки расследования в `/incidents/details?id=...`.
+4. Перейти в `/logs` и показать исходные события по конкретному хосту.
+5. Коротко открыть `/analytics`, если нужен обзор сводки.
+6. При необходимости показать desktop-клиент как резервную витрину с теми же данными.
+
+## Что уже загружено в demo-наборе
+
+В fixture заранее есть:
+- baseline-фон без инцидентов;
+- `R001` - brute force;
+- `R002` - night admin login;
+- `R003` - suspicious PowerShell download;
+- `R004` - log tampering;
+- `R005` - privilege escalation.
+
+Сценарные хосты:
+- `bf-srv-01`
+- `night-admin-01`
+- `powershell-01`
+- `tamper-01`
+- `priv-esc-01`
+- `ops-srv-01`
+- `ops-ws-01`
+
+## Если нужен дополнительный live-показ
+
+Live-agent больше не обязателен для защиты. Его стоит запускать только как дополнительное подтверждение архитектуры:
 
 ```bash
-curl http://127.0.0.1:8080/health
+cd /opt/barsuksiem/agent-pack
+./run-agent.sh
 ```
 
-## Шаг 2. Вход в web UI
-
-- открыть `http://127.0.0.1:8080/login`
-- войти под bootstrap admin
-- показать главную страницу `/`
-
-## Шаг 3. Запуск агента
-
-```bash
-python main.py agent --server http://127.0.0.1:8080 --source journal --interval 60
-```
-
-Если нужен воспроизводимый demo, можно использовать:
-
-```bash
-python main.py agent --server http://127.0.0.1:8080 --source file --interval 60
-```
-
-## Шаг 4. Показ логов
-
-Открыть `/logs` и показать:
-
-- новые события
-- фильтрацию по severity
-- фильтрацию по host
-- поиск по message
-
-## Шаг 5. Показ инцидентов
-
-Открыть `/incidents` и показать:
-
-- инциденты, созданные на основе поступивших событий
-- карточку инцидента `/incidents/details?id=...`
-- severity и rule-based классификацию
-
-## Шаг 6. Показ аналитики
-
-Открыть:
-
-- `/`
-- `/analytics`
-- `/compliance`
-- `/inventory`
-
-## Шаг 7. Подтверждение воспроизводимости
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-На защите имеет смысл отдельно проговорить, что тесты подтверждают login/logout/CSRF, ingest и ключевые incident rules.
+Основную демонстрацию лучше строить только на заранее загруженном demo-стенде.

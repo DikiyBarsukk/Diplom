@@ -1,9 +1,10 @@
-﻿import json
+import json
 import socket
 import tempfile
 import threading
 import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -11,6 +12,7 @@ import uvicorn
 
 from server.app_factory import create_app
 from server.config import AppConfig
+from server.demo_loader import EXPECTED_RULE_IDS, load_fixture, materialize_fixture
 
 
 class ApiIntegrationTests(unittest.TestCase):
@@ -35,6 +37,7 @@ class ApiIntegrationTests(unittest.TestCase):
         self.base_url = f"http://127.0.0.1:{self.port}"
         self.session = requests.Session()
         self.demo_logs = json.loads(Path("tests/data/demo_logs.json").read_text(encoding="utf-8"))
+        self.demo_master_template = load_fixture(Path("tests/data/demo_master_template.json"))
         self._wait_until_ready()
 
     def tearDown(self):
@@ -106,6 +109,23 @@ class ApiIntegrationTests(unittest.TestCase):
     def test_requires_auth_for_stats(self):
         response = requests.get(f"{self.base_url}/api/stats", timeout=5)
         self.assertEqual(response.status_code, 401)
+
+    def test_demo_fixture_triggers_all_rules_via_api(self):
+        fixed_now = datetime(2026, 4, 1, 12, 34, tzinfo=timezone.utc)
+        events = materialize_fixture(self.demo_master_template, now=fixed_now)
+
+        ingest_response = self.session.post(f"{self.base_url}/api/logs", json=events, timeout=10)
+        self.assertEqual(ingest_response.status_code, 200)
+        self.assertEqual(ingest_response.json()["saved"], len(events))
+
+        incidents_response = self.session.get(f"{self.base_url}/api/incidents?limit=50", timeout=10)
+        self.assertEqual(incidents_response.status_code, 200)
+        rule_ids = {incident["rule_id"] for incident in incidents_response.json()}
+        self.assertTrue(set(EXPECTED_RULE_IDS).issubset(rule_ids))
+
+        stats_response = self.session.get(f"{self.base_url}/api/stats", timeout=5)
+        self.assertEqual(stats_response.status_code, 200)
+        self.assertEqual(stats_response.json()["total_events"], len(events))
 
 
 if __name__ == "__main__":
